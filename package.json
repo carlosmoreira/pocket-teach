@@ -1,0 +1,22 @@
+{
+  "name": "pocket-teach",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Pocket Teach — an offline-first PWA + generation gateway for LLM-authored learning lessons, built on the /teach methodology.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carlosmoreira/pocket-teach.git"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter gateway dev",
+    "start": "pnpm --filter gateway start",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r build"
+  }
+}

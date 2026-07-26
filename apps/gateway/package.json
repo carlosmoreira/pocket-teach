@@ -1,0 +1,28 @@
+{
+  "name": "gateway",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pocket Teach generation gateway — a thin, stateless LLM gateway encoding the /teach methodology.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@pocket-teach/api-types": "workspace:*",
+    "fastify": "^5.2.0",
+    "pino": "^9.6.0",
+    "tsx": "^4.19.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.8.0"
+  }
+}
