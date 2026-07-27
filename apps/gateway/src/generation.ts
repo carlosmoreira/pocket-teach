@@ -3,7 +3,6 @@ import { extractTeachMeta } from '@pocket-teach/api-types';
 import type { LLMProvider, PlanArgs } from './providers/LLMProvider.js';
 import type { SseStream } from './http/sse.js';
 
-/** The unit cached by the idempotency layer — the finished generation. */
 export interface GenerationResult {
   plan: LessonPlan;
   html: string;
@@ -29,14 +28,8 @@ function emitPhase(
   sse.event('phase', event);
 }
 
-/**
- * Run a fresh generation, streaming the canonical phase sequence
- * `planning → researching → plan → writing → done` with heartbeats, and return
- * the finished result so the idempotency layer can cache it.
- *
- * TODO(chunk-2): the `plan`/`write` calls below already go through the provider
- * seam — chunk 2 only has to make the provider real (AI SDK + web_search).
- */
+// TODO(chunk-2): the `plan`/`write` calls below already go through the provider
+// seam — chunk 2 only has to make the provider real (AI SDK + web_search).
 export async function generateFresh(
   sse: SseStream,
   provider: LLMProvider,
@@ -65,7 +58,6 @@ export async function generateFresh(
     contextMarkdown: planArgs.contextMarkdown,
   });
 
-  // Validate the island the same way the real gateway will (defence in depth).
   const check = extractTeachMeta(html);
   if (!check.ok) {
     // TODO(chunk-2): one repair retry before surfacing an error.
@@ -84,10 +76,6 @@ export async function generateFresh(
   return { plan, html, meta };
 }
 
-/**
- * Replay a cached result for a repeated `requestId` (the dropped-generation
- * retry path) — no model calls, no re-billing.
- */
 export function replayResult(sse: SseStream, result: GenerationResult): void {
   emitPhase(sse, 'plan');
   sse.event('plan', { type: 'plan', plan: result.plan } satisfies SseEvent);

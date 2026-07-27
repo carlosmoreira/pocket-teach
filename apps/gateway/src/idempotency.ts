@@ -1,22 +1,13 @@
-/**
- * Dropped-generation safety net.
- *
- * The app sends a `requestId`; the gateway keeps a small `Map<requestId,
- * result>` with a ~10-min TTL. On a dropped SSE, the app retries the *same*
- * `requestId` → gets the finished result back if it completed (never
- * double-charged). Node keeps the handler running after a client disconnect, so
- * completed work is cached even if `done` never reached the app.
- *
- * This is the whole "state" the gateway holds — an ephemeral safety net, not a
- * database.
- */
+// Node keeps the handler running after a client disconnect, so completed work is
+// cached even if `done` never reached the app — the retry of the same requestId
+// gets the finished result back and is never double-charged.
 
 interface Entry<T> {
   value: T;
   expiresAt: number;
 }
 
-const DEFAULT_TTL_MS = 10 * 60 * 1000; // ~10 minutes
+const DEFAULT_TTL_MS = 10 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
 export class IdempotencyCache {
@@ -53,11 +44,6 @@ export class IdempotencyCache {
     });
   }
 
-  /**
-   * Return the cached result for `requestId` if present, else run `fn`, cache,
-   * and return its result. `cached` tells the caller whether it was a hit (so a
-   * streaming endpoint can replay instead of re-generating).
-   */
   async withIdempotency<T>(
     requestId: string,
     fn: () => Promise<T>,
@@ -71,7 +57,6 @@ export class IdempotencyCache {
     return { cached: false, value };
   }
 
-  /** Test/introspection helper. */
   get size(): number {
     return this.store.size;
   }

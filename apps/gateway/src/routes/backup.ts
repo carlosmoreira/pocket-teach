@@ -5,10 +5,6 @@ interface Deps {
   store: BackupStore;
 }
 
-/**
- * Backup blob store endpoints. `POST /backup` persists the posted workspace
- * blob; `GET /backup` returns the latest (or 404 if none yet).
- */
 export function registerBackupRoutes(app: FastifyInstance, deps: Deps): void {
   app.post('/backup', async (req, reply) => {
     if (req.body === undefined || req.body === null) {

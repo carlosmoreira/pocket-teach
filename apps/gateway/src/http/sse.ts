@@ -1,13 +1,8 @@
 import type { FastifyReply } from 'fastify';
 
-/**
- * Minimal Server-Sent-Events writer over `reply.raw`.
- *
- * We hijack the reply so Fastify won't try to serialize a response, then write
- * `event:`/`data:` frames and `:` heartbeat comments directly. Every write is
- * guarded so a client disconnect (after which Node keeps the handler running)
- * can't crash the process.
- */
+// Hijack the reply so Fastify won't serialize a response. Every write is guarded
+// so a client disconnect — after which Node keeps the handler running — can't
+// crash the process.
 export interface SseStream {
   event(name: string, data: unknown): void;
   comment(text: string): void;

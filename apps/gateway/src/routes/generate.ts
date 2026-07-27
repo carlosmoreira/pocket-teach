@@ -23,11 +23,6 @@ function badRequest(reply: FastifyReply, error: ZodError): void {
   reply.code(400).send({ error: 'invalid request body', issues: error.issues });
 }
 
-/**
- * Shared SSE generation handler: withIdempotency(requestId) → stream phases
- * (fresh) or replay (cached final result). The body is validated by each route
- * before this runs.
- */
 async function handleGeneration(
   app: FastifyInstance,
   deps: Deps,
