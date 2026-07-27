@@ -1,13 +1,16 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { generateObject, streamText } from 'ai';
+import { generateObject, generateText, stepCountIs, streamText } from 'ai';
 import type { ChatEvent, LessonPlan } from '@pocket-teach/api-types';
 import { LessonPlanSchema, extractTeachMeta } from '@pocket-teach/api-types';
 import {
+  AMPLIFY_PROMPT,
   CHAT_PROMPT,
   PLANNER_PROMPT,
+  PLAN_STRUCTURE_PROMPT,
   SYSTEM_PREAMBLE,
   WRITER_PROMPT,
 } from '../prompts/teach.js';
+import { BASE_CSS } from '../style/base-css.js';
 import type {
   ChatArgs,
   LLMProvider,
@@ -26,6 +29,10 @@ const PLAN_MAX_TOKENS = 4096;
 const WRITER_MAX_TOKENS = 16000;
 const CHAT_MAX_TOKENS = 4096;
 
+const RESEARCH_MAX_STEPS = 8;
+const WEB_SEARCH_MAX_USES = 6;
+const WEB_FETCH_MAX_USES = 5;
+
 const MISSING_KEY_ERROR =
   'ANTHROPIC_API_KEY is not set. The gateway starts without it, but generation and chat need a real key — set ANTHROPIC_API_KEY in the gateway environment.';
 
@@ -40,7 +47,7 @@ export interface ClaudeProviderOptions {
 export class ClaudeProvider implements LLMProvider {
   readonly id = 'claude';
   readonly capabilities: ProviderCapabilities = {
-    webSearch: false,
+    webSearch: true,
     promptCache: false,
   };
 
@@ -59,15 +66,43 @@ export class ClaudeProvider implements LLMProvider {
     return this.anthropic;
   }
 
+  // Two steps because Anthropic structured outputs and web-search citations
+  // can't share one call: step 1 grounds via web tools, step 2 structures it.
   async plan(args: PlanArgs): Promise<LessonPlan> {
-    const { object } = await generateObject({
-      model: this.provider()(this.models.planner),
-      schema: LessonPlanSchema,
+    const anthropic = this.provider();
+
+    let signalled = false;
+    const research = await generateText({
+      model: anthropic(this.models.planner),
       system: SYSTEM_PREAMBLE,
       prompt: plannerPrompt(args),
+      tools: {
+        webSearch: anthropic.tools.webSearch_20260209({
+          maxUses: WEB_SEARCH_MAX_USES,
+        }),
+        webFetch: anthropic.tools.webFetch_20260209({
+          maxUses: WEB_FETCH_MAX_USES,
+        }),
+      },
+      stopWhen: stepCountIs(RESEARCH_MAX_STEPS),
+      maxOutputTokens: PLAN_MAX_TOKENS,
+      onStepFinish({ toolCalls }) {
+        if (!signalled && toolCalls.length > 0) {
+          signalled = true;
+          args.onResearch?.();
+        }
+      },
+    });
+
+    const { object } = await generateObject({
+      model: anthropic(this.models.planner),
+      schema: LessonPlanSchema,
+      system: PLAN_STRUCTURE_PROMPT,
+      prompt: research.text,
       maxOutputTokens: PLAN_MAX_TOKENS,
     });
-    return object;
+
+    return LessonPlanSchema.parse(object);
   }
 
   async write(args: WriteArgs): Promise<WriteResult> {
@@ -122,7 +157,8 @@ export class ClaudeProvider implements LLMProvider {
 }
 
 function plannerPrompt(args: PlanArgs): string {
-  const parts = [PLANNER_PROMPT];
+  const amplifying = args.confusion !== undefined;
+  const parts = [amplifying ? `${PLANNER_PROMPT}\n\n${AMPLIFY_PROMPT}` : PLANNER_PROMPT];
   if (args.topic) parts.push(`Topic: ${args.topic}`);
   if (args.why) parts.push(`Why they want to learn it: ${args.why}`);
   if (args.successLooksLike)
@@ -130,7 +166,8 @@ function plannerPrompt(args: PlanArgs): string {
   if (args.constraints) parts.push(`Constraints: ${args.constraints}`);
   if (args.contextMarkdown)
     parts.push(`Current workspace:\n${args.contextMarkdown}`);
-  if (args.lessonHtml) parts.push(`Current lesson HTML:\n${args.lessonHtml}`);
+  if (args.lessonHtml)
+    parts.push(`Current lesson to clarify (keep its objective):\n${args.lessonHtml}`);
   if (args.confusion)
     parts.push(`Learner confusion to clarify in place:\n${args.confusion}`);
   return parts.join('\n\n');
@@ -139,9 +176,16 @@ function plannerPrompt(args: PlanArgs): string {
 function writerPrompt(args: WriteArgs): string {
   const parts = [
     WRITER_PROMPT,
+    `Canonical base stylesheet to inline verbatim:\n${BASE_CSS}`,
     `LessonPlan (JSON):\n${JSON.stringify(args.plan, null, 2)}`,
   ];
+  if (args.previousLessonHtml) {
+    parts.push(AMPLIFY_PROMPT);
+    parts.push(`Lesson being clarified (reuse its slug + objective):\n${args.previousLessonHtml}`);
+  }
+  if (args.confusion)
+    parts.push(`Confusion to resolve:\n${args.confusion}`);
   if (args.contextMarkdown)
-    parts.push(`Current workspace:\n${args.contextMarkdown}`);
+    parts.push(`Current workspace (lesson index for cross-links):\n${args.contextMarkdown}`);
   return parts.join('\n\n');
 }

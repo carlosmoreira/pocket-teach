@@ -18,11 +18,14 @@ export interface PlanArgs {
   constraints?: string;
   lessonHtml?: string;
   confusion?: string;
+  onResearch?: () => void;
 }
 
 export interface WriteArgs {
   plan: LessonPlan;
   contextMarkdown?: string;
+  previousLessonHtml?: string;
+  confusion?: string;
 }
 
 export interface WriteResult {

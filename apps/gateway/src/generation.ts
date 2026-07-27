@@ -23,10 +23,17 @@ export async function generateFresh(
   try {
     emitPhase(sse, 'planning');
     sse.comment('heartbeat');
-    const plan = await provider.plan(planArgs);
 
-    emitPhase(sse, 'researching');
-    sse.comment('heartbeat');
+    let researching = false;
+    const plan = await provider.plan({
+      ...planArgs,
+      onResearch: () => {
+        if (researching) return;
+        researching = true;
+        emitPhase(sse, 'researching');
+        sse.comment('heartbeat');
+      },
+    });
 
     emitPhase(sse, 'plan');
     sse.event('plan', { type: 'plan', plan } satisfies SseEvent);
@@ -36,6 +43,8 @@ export async function generateFresh(
     const { html, meta } = await provider.write({
       plan,
       contextMarkdown: planArgs.contextMarkdown,
+      previousLessonHtml: planArgs.lessonHtml,
+      confusion: planArgs.confusion,
     });
 
     emitPhase(sse, 'done');
