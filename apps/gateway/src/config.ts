@@ -6,7 +6,6 @@ const EnvSchema = z.object({
   PROVIDER: z.string().min(1).default('claude'),
   PLANNER_MODEL: z.string().min(1).default('claude-sonnet-5'),
   WRITER_MODEL: z.string().min(1).default('claude-sonnet-5'),
-  // Optional in chunk 1 (logic is stubbed). Required once the AI SDK lands.
   ANTHROPIC_API_KEY: z.string().optional(),
 });
 
