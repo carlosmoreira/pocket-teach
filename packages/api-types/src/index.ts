@@ -6,3 +6,4 @@ export * from './sse.js';
 export * from './requests.js';
 export * from './chat.js';
 export * from './meta-island.js';
+export * from './chat-islands.js';

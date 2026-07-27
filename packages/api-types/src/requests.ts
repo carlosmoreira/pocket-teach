@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import {
+  ReadLessonToolCallSchema,
+  ReadLessonToolResultSchema,
+} from './chat.js';
 
-// requestId is the idempotency key — retrying the same id returns the cached
-// result rather than re-billing a generation.
 export const GenerateProjectRequestSchema = z.object({
   topic: z.string().min(1),
   why: z.string().optional(),
@@ -28,11 +30,34 @@ export type GenerateAmplifyRequest = z.infer<typeof GenerateAmplifyRequestSchema
 export const ChatRoleSchema = z.enum(['user', 'assistant']);
 export type ChatRole = z.infer<typeof ChatRoleSchema>;
 
-// The app stores + replays the transcript; the gateway is stateless.
-export const ChatMessageSchema = z.object({
+export const TextChatMessageSchema = z.object({
+  type: z.literal('text'),
   role: ChatRoleSchema,
   content: z.string(),
 });
+export type TextChatMessage = z.infer<typeof TextChatMessageSchema>;
+
+export const ReadLessonCallChatMessageSchema = z.object({
+  type: z.literal('tool_call'),
+  call: ReadLessonToolCallSchema,
+});
+export type ReadLessonCallChatMessage = z.infer<
+  typeof ReadLessonCallChatMessageSchema
+>;
+
+export const ReadLessonResultChatMessageSchema = z.object({
+  type: z.literal('tool_result'),
+  result: ReadLessonToolResultSchema,
+});
+export type ReadLessonResultChatMessage = z.infer<
+  typeof ReadLessonResultChatMessageSchema
+>;
+
+export const ChatMessageSchema = z.discriminatedUnion('type', [
+  TextChatMessageSchema,
+  ReadLessonCallChatMessageSchema,
+  ReadLessonResultChatMessageSchema,
+]);
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
 export const ChatRequestSchema = z.object({
