@@ -3,5 +3,10 @@ packages:
   - 'packages/*'
 
 # esbuild ships a prebuilt native binary via its install script; tsx needs it.
+# The Angular build's native optional accelerators load their prebuilt bindings
+# at runtime and fall back gracefully, so their install scripts stay disabled.
 allowBuilds:
+  '@parcel/watcher': false
   esbuild: true
+  lmdb: false
+  msgpackr-extract: false

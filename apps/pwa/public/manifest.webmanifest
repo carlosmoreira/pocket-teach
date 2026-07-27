@@ -1,0 +1,19 @@
+{
+  "name": "Pocket Teach",
+  "short_name": "Pocket Teach",
+  "description": "Offline-first learning lessons authored by an LLM, built on the /teach methodology.",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "./",
+  "start_url": "./",
+  "background_color": "#f6f7fb",
+  "theme_color": "#5b5bd6",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

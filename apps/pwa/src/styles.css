@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Pocket Teach design tokens — mirrors design.html ── */
+@theme {
+  --color-bg: #f6f7fb;
+  --color-panel: #ffffff;
+  --color-ink: #1a1d29;
+  --color-muted: #5b6172;
+  --color-line: #e5e8f0;
+  --color-accent: #5b5bd6;
+  --color-accent-2: #12a594;
+  --color-warn: #d9480f;
+  --color-chip: #eef0fb;
+
+  --radius-card: 16px;
+  --radius-field: 11px;
+}
+
+:root {
+  --bg: #f6f7fb;
+  --panel: #ffffff;
+  --ink: #1a1d29;
+  --muted: #5b6172;
+  --line: #e5e8f0;
+  --accent: #5b5bd6;
+  --accent-2: #12a594;
+  --warn: #d9480f;
+  --chip: #eef0fb;
+  --ok: #12a594;
+  --shadow: 0 10px 30px rgba(30, 34, 60, 0.1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0f16;
+    --panel: #151824;
+    --ink: #e9ecf5;
+    --muted: #9aa1b8;
+    --line: #242838;
+    --accent: #8b8bff;
+    --accent-2: #2dd4bf;
+    --warn: #ff8a5c;
+    --chip: #1c2030;
+    --ok: #2dd4bf;
+    --shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
