@@ -15,8 +15,8 @@ function selectProvider(config: Config): LLMProvider {
   switch (config.PROVIDER) {
     case 'claude':
       return new ClaudeProvider({
-        planner: config.PLANNER_MODEL,
-        writer: config.WRITER_MODEL,
+        apiKey: config.ANTHROPIC_API_KEY,
+        models: { planner: config.PLANNER_MODEL, writer: config.WRITER_MODEL },
       });
     // TODO(chunk-2+): drop in GPT/Ollama providers behind the same seam.
     default:
