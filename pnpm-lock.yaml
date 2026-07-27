@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  apps/gateway:
+  apps/api:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: ^4.0.21
@@ -42,7 +42,7 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
-  apps/pwa:
+  apps/frontend:
     dependencies:
       '@angular/cdk':
         specifier: ^22.0.2

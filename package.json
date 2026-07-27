@@ -14,10 +14,10 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "dev": "pnpm --filter gateway dev",
-    "dev:pwa": "pnpm --filter pwa dev",
-    "build:pwa": "pnpm --filter pwa build",
-    "start": "pnpm --filter gateway start",
+    "dev": "pnpm --filter api dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build:frontend": "pnpm --filter frontend build",
+    "start": "pnpm --filter api start",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r build"
   }
