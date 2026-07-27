@@ -1,10 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-/**
- * Bearer-token auth. A single static token guards every route — the network
- * (intranet + Tailscale/WireGuard) is the real boundary, this just stops stray
- * calls. `/health` and CORS preflight (OPTIONS) are exempt.
- */
 export function makeAuthHook(token: string) {
   const expected = `Bearer ${token}`;
 

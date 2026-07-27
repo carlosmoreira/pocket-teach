@@ -14,20 +14,11 @@ import type {
   WriteResult,
 } from './LLMProvider.js';
 
-/** The canonical base stylesheet, inlined into every generated lesson. */
 const BASE_CSS = readFileSync(
   fileURLToPath(new URL('../style/base.css', import.meta.url)),
   'utf8',
 );
 
-/**
- * STUB Claude provider for CHUNK 1.
- *
- * Returns canned but *contract-valid* output so every endpoint works with no
- * API key: a real LessonPlan, real self-contained HTML with a working inline
- * quiz + a valid `#teach-meta` island, and a canned chat stream. Chunk 2
- * replaces the bodies with real AI-SDK calls behind the exact same interface.
- */
 export class ClaudeProvider implements LLMProvider {
   readonly id = 'claude';
   readonly capabilities: ProviderCapabilities = {
@@ -113,7 +104,6 @@ export class ClaudeProvider implements LLMProvider {
     for (const delta of sentences) {
       yield { type: 'message', delta };
     }
-    // Illustrative propose-then-confirm island (canned).
     yield {
       type: 'proposal',
       proposal: {
@@ -128,7 +118,6 @@ export class ClaudeProvider implements LLMProvider {
   }
 }
 
-/** Build a self-contained, mobile-responsive lesson document with an inline quiz. */
 function renderLessonHtml(
   title: string,
   plan: LessonPlan,
@@ -138,7 +127,7 @@ function renderLessonHtml(
     .map((p) => `      <li>${escapeHtml(p)}</li>`)
     .join('\n');
 
-  // Quiz options kept equal-ish length per the /teach quiz rule (illustrative).
+  // Options kept equal-ish length per the /teach quiz rule.
   const options = [
     { text: 'A predictive model', correct: true },
     { text: 'A random guesser', correct: false },
@@ -199,7 +188,7 @@ ${metaJson}
 </script>
 
 <script>
-  // Minimal, self-contained quiz interactivity (runs inside the sandboxed iframe).
+  // Runs inside the sandboxed iframe, so keep it self-contained.
   (function () {
     var quiz = document.querySelector('.pt-quiz');
     if (!quiz) return;

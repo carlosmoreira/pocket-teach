@@ -1,14 +1,3 @@
-/**
- * Ported `/teach` prompts.
- *
- * These are deliberate placeholders for CHUNK 1. The real work of chunk 2 is
- * distilling Matt Pocock's `SKILL.md` + the four `*-FORMAT.md` specs into these
- * system prompts: mission grounding, knowledge-first then a tight skill-drill,
- * cite one high-trust primary source, the equal-length quiz-option rule, "Think
- * Tufte" / working-memory sizing, cross-linking, and the `<record>`-on-
- * demonstrated-understanding rule.
- */
-
 // TODO(chunk-2): port SKILL.md into the shared system preamble.
 export const SYSTEM_PREAMBLE = `You are Pocket Teach, a patient expert tutor. (STUB — port SKILL.md here.)`;
 

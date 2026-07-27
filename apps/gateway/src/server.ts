@@ -11,7 +11,6 @@ import { registerGenerateRoutes } from './routes/generate.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerBackupRoutes } from './routes/backup.js';
 
-/** Select the LLM provider from config. v1 implements only Claude (stubbed). */
 function selectProvider(config: Config): LLMProvider {
   switch (config.PROVIDER) {
     case 'claude':
@@ -36,17 +35,14 @@ export async function buildServer(config: Config) {
 
   await app.register(cors, { origin: true });
 
-  // Auth on everything except /health + preflight.
   app.addHook('onRequest', makeAuthHook(config.GATEWAY_TOKEN));
 
-  // Shared singletons.
   const provider = selectProvider(config);
   const search = new NoopSearchProvider();
   void search; // wired into the provider in chunk 2 (grounding axis).
   const cache = new IdempotencyCache();
   const backupStore = new FileBackupStore();
 
-  // Docker-friendly liveness probe (no auth).
   app.get('/health', async () => ({ status: 'ok' }));
 
   registerGenerateRoutes(app, { provider, cache });
@@ -87,7 +83,6 @@ async function main(): Promise<void> {
   }
 }
 
-// Run when invoked directly (tsx src/server.ts / node dist/server.js).
 main().catch((err) => {
   // eslint-disable-next-line no-console
   console.error(err);

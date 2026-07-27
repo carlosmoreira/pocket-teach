@@ -2,13 +2,6 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/**
- * Backup blob store. A tiny endpoint accepts/returns the app's workspace backup
- * blob for off-device recovery. Barely any state: a single latest blob
- * persisted to a gitignored `data/` dir, with an in-memory fallback if the disk
- * isn't writable.
- */
-
 const DATA_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
   '..',

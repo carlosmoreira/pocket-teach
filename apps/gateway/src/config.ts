@@ -1,9 +1,5 @@
 import { z } from 'zod';
 
-/**
- * Zod-validated environment. Parsed once at boot; a bad env fails fast with a
- * readable message rather than surfacing deep in a request handler.
- */
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8787),
   GATEWAY_TOKEN: z.string().min(1).default('dev-token'),

@@ -2,10 +2,6 @@ import { z } from 'zod';
 import { LessonPlanSchema } from './lesson-plan.js';
 import { TeachMetaSchema } from './teach-meta.js';
 
-/**
- * SSE phases the generation endpoints stream, in order:
- * `planning → researching → plan → writing → done` (or `error`).
- */
 export const PhaseSchema = z.enum([
   'planning',
   'researching',
@@ -41,7 +37,6 @@ export const ErrorEventSchema = z.object({
 });
 export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
 
-/** The full generation SSE event union. */
 export const SseEventSchema = z.discriminatedUnion('type', [
   PhaseEventSchema,
   PlanEventSchema,
