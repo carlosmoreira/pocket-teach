@@ -19,9 +19,6 @@ export function registerChatRoutes(app: FastifyInstance, deps: Deps): void {
 
     const sse = startSse(reply);
     try {
-      // TODO(chunk-2): drive the read_lesson tool loop here — when the provider
-      // yields a { type: 'tool_call', call: { tool: 'read_lesson', slug } }, the
-      // APP answers from Dexie and re-invokes /chat. The gateway stays stateless.
       for await (const event of deps.provider.chat(parsed.data)) {
         sse.event(event.type, event satisfies ChatEvent);
         if (sse.closed) break;

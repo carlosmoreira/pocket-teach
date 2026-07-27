@@ -1,13 +1,35 @@
 import { z } from 'zod';
 
-export const ProposalSchema = z.object({
-  objective: z.string().min(1),
-  rationale: z.string().min(1),
-});
+export const ProposalKindSchema = z.enum(['new_lesson', 'amplify']);
+export type ProposalKind = z.infer<typeof ProposalKindSchema>;
+
+export const ProposalSchema = z
+  .object({
+    kind: ProposalKindSchema,
+    objective: z.string().min(1),
+    rationale: z.string().min(1),
+    targetSlug: z.string().min(1).optional(),
+    focus: z.string().min(1).optional(),
+  })
+  .superRefine((proposal, ctx) => {
+    if (proposal.kind !== 'amplify') return;
+    if (!proposal.targetSlug) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['targetSlug'],
+        message: 'amplify proposal requires targetSlug',
+      });
+    }
+    if (!proposal.focus) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['focus'],
+        message: 'amplify proposal requires focus',
+      });
+    }
+  });
 export type Proposal = z.infer<typeof ProposalSchema>;
 
-// The ZPD memory (not quiz scoring): emitted only when the learner demonstrates
-// understanding, reveals prior knowledge, or corrects a misconception.
 export const LearningRecordNoteSchema = z.object({
   note: z.string().min(1),
 });
