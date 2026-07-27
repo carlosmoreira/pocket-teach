@@ -1,7 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-// The network (intranet + Tailscale/WireGuard) is the real boundary; this just
-// stops stray calls.
 export function makeAuthHook(token: string) {
   const expected = `Bearer ${token}`;
 
