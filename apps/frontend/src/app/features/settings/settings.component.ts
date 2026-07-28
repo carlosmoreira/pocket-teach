@@ -47,7 +47,9 @@ type TestState =
           </span>
           <div>
             <h1 class="text-lg font-bold tracking-tight" style="color:var(--ink)">Settings</h1>
-            <p class="text-sm" style="color:var(--muted)">Connect Pocket Teach to your generation gateway.</p>
+            <p class="text-sm" style="color:var(--muted)">
+              Connect Pocket Teach to your generation gateway.
+            </p>
           </div>
         </header>
 
@@ -56,7 +58,11 @@ type TestState =
           style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
         >
           <div class="flex flex-col gap-1.5">
-            <label for="baseUrl" class="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style="color:var(--muted)">
+            <label
+              for="baseUrl"
+              class="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+              style="color:var(--muted)"
+            >
               <ng-icon name="lucideLink" size="13" /> Gateway base URL
             </label>
             <input
@@ -74,7 +80,11 @@ type TestState =
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="token" class="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style="color:var(--muted)">
+            <label
+              for="token"
+              class="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+              style="color:var(--muted)"
+            >
               <ng-icon name="lucideKey" size="13" /> Bearer token
             </label>
             <input
@@ -157,8 +167,10 @@ export class SettingsComponent {
 
   protected readonly bannerStyle = computed(() => {
     const kind = this.test().kind;
-    if (kind === 'ok') return 'background:color-mix(in srgb,var(--accent-2) 14%,transparent);color:var(--accent-2)';
-    if (kind === 'error') return 'background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)';
+    if (kind === 'ok')
+      return 'background:color-mix(in srgb,var(--accent-2) 14%,transparent);color:var(--accent-2)';
+    if (kind === 'error')
+      return 'background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)';
     return 'background:var(--chip);color:var(--muted)';
   });
 

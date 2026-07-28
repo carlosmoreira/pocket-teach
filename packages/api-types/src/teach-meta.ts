@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  GlossaryEntrySchema,
-  PrimarySourceSchema,
-  ResourceEntrySchema,
-} from './common.js';
+import { GlossaryEntrySchema, PrimarySourceSchema, ResourceEntrySchema } from './common.js';
 
 // The portable island that makes model-switching an env change — any model can
 // emit "HTML with this one JSON island".

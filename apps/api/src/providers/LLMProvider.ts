@@ -1,9 +1,4 @@
-import type {
-  ChatEvent,
-  ChatMessage,
-  LessonPlan,
-  TeachMeta,
-} from '@pocket-teach/api-types';
+import type { ChatEvent, ChatMessage, LessonPlan, TeachMeta } from '@pocket-teach/api-types';
 
 export interface ProviderCapabilities {
   webSearch: boolean;

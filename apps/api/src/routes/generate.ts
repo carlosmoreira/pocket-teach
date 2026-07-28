@@ -8,11 +8,7 @@ import {
 import type { LLMProvider, PlanArgs } from '../providers/LLMProvider.js';
 import type { IdempotencyCache } from '../idempotency.js';
 import { startSse } from '../http/sse.js';
-import {
-  generateFresh,
-  replayResult,
-  type GenerationResult,
-} from '../generation.js';
+import { generateFresh, replayResult, type GenerationResult } from '../generation.js';
 
 interface Deps {
   provider: LLMProvider;
@@ -32,10 +28,9 @@ async function handleGeneration(
 ): Promise<void> {
   const sse = startSse(reply);
   try {
-    const { cached, value } =
-      await deps.cache.withIdempotency<GenerationResult>(requestId, () =>
-        generateFresh(sse, deps.provider, planArgs),
-      );
+    const { cached, value } = await deps.cache.withIdempotency<GenerationResult>(requestId, () =>
+      generateFresh(sse, deps.provider, planArgs),
+    );
     if (cached) {
       app.log.info({ requestId }, 'idempotent replay (cache hit)');
       replayResult(sse, value);

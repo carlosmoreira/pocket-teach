@@ -50,15 +50,15 @@ The default dev token is `dev-token`.
 
 ## Endpoints
 
-| Method | Path                | Auth | Notes                                          |
-| ------ | ------------------- | ---- | ---------------------------------------------- |
-| GET    | `/health`           | no   | `{status:"ok"}` — container `HEALTHCHECK`      |
-| POST   | `/generate/project` | yes  | SSE — mission + lesson 1 (interview inputs)     |
-| POST   | `/generate/lesson`  | yes  | SSE — next grounded lesson                      |
-| POST   | `/generate/amplify` | yes  | SSE — clarify-in-place, same objective + slug   |
-| POST   | `/chat`             | yes  | SSE — teacher chat (grounded + `read_lesson`)   |
-| POST   | `/backup`           | yes  | store the workspace backup blob                 |
-| GET    | `/backup`           | yes  | fetch the latest backup blob                    |
+| Method | Path                | Auth | Notes                                         |
+| ------ | ------------------- | ---- | --------------------------------------------- |
+| GET    | `/health`           | no   | `{status:"ok"}` — container `HEALTHCHECK`     |
+| POST   | `/generate/project` | yes  | SSE — mission + lesson 1 (interview inputs)   |
+| POST   | `/generate/lesson`  | yes  | SSE — next grounded lesson                    |
+| POST   | `/generate/amplify` | yes  | SSE — clarify-in-place, same objective + slug |
+| POST   | `/chat`             | yes  | SSE — teacher chat (grounded + `read_lesson`) |
+| POST   | `/backup`           | yes  | store the workspace backup blob               |
+| GET    | `/backup`           | yes  | fetch the latest backup blob                  |
 
 ## Docker (API)
 

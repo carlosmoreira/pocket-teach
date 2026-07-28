@@ -1,11 +1,8 @@
 import { TeachMetaSchema, type TeachMeta } from './teach-meta.js';
 
-export type MetaIslandResult =
-  | { ok: true; meta: TeachMeta }
-  | { ok: false; error: string };
+export type MetaIslandResult = { ok: true; meta: TeachMeta } | { ok: false; error: string };
 
-const ISLAND_RE =
-  /<script[^>]*\bid=["']teach-meta["'][^>]*>([\s\S]*?)<\/script>/i;
+const ISLAND_RE = /<script[^>]*\bid=["']teach-meta["'][^>]*>([\s\S]*?)<\/script>/i;
 
 // Returns a discriminated result rather than throwing so callers can decide
 // whether to trigger the one repair retry.

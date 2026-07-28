@@ -5,16 +5,12 @@ import {
   type LearningRecordNote,
 } from './islands.js';
 
-export type ProposalIslandResult =
-  | { ok: true; proposal: Proposal }
-  | { ok: false; error: string };
+export type ProposalIslandResult = { ok: true; proposal: Proposal } | { ok: false; error: string };
 
 export type RecordIslandResult =
-  | { ok: true; record: LearningRecordNote }
-  | { ok: false; error: string };
+  { ok: true; record: LearningRecordNote } | { ok: false; error: string };
 
-const PROPOSAL_RE =
-  /<script[^>]*\bid=["']proposal["'][^>]*>([\s\S]*?)<\/script>/i;
+const PROPOSAL_RE = /<script[^>]*\bid=["']proposal["'][^>]*>([\s\S]*?)<\/script>/i;
 const RECORD_RE = /<script[^>]*\bid=["']record["'][^>]*>([\s\S]*?)<\/script>/i;
 
 export function extractProposal(text: string): ProposalIslandResult {

@@ -1,12 +1,5 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
-import {
-  generateObject,
-  generateText,
-  stepCountIs,
-  streamText,
-  tool,
-  type ModelMessage,
-} from 'ai';
+import { generateObject, generateText, stepCountIs, streamText, tool, type ModelMessage } from 'ai';
 import { z } from 'zod';
 import type { ChatEvent, ChatMessage, LessonPlan } from '@pocket-teach/api-types';
 import {
@@ -48,7 +41,7 @@ const WEB_SEARCH_MAX_USES = 6;
 const WEB_FETCH_MAX_USES = 5;
 
 const READ_LESSON_DESCRIPTION =
-  'Fetch the full HTML body of a lesson already in this workspace, by its slug from the lesson index. Use only when a recap is not enough — when you need the lesson\'s exact wording, worked example, or quiz. The app serves the body and the conversation continues.';
+  "Fetch the full HTML body of a lesson already in this workspace, by its slug from the lesson index. Use only when a recap is not enough — when you need the lesson's exact wording, worked example, or quiz. The app serves the body and the conversation continues.";
 
 const MISSING_KEY_ERROR =
   'ANTHROPIC_API_KEY is not set. The gateway starts without it, but generation and chat need a real key — set ANTHROPIC_API_KEY in the gateway environment.';
@@ -73,9 +66,7 @@ export class ClaudeProvider implements LLMProvider {
 
   constructor(options: ClaudeProviderOptions = {}) {
     this.models = options.models ?? { ...DEFAULT_MODELS };
-    this.anthropic = options.apiKey
-      ? createAnthropic({ apiKey: options.apiKey })
-      : undefined;
+    this.anthropic = options.apiKey ? createAnthropic({ apiKey: options.apiKey }) : undefined;
   }
 
   private provider(): ReturnType<typeof createAnthropic> {
@@ -232,9 +223,7 @@ function toModelMessages(history: ChatMessage[]): ModelMessage[] {
       };
       const prev = messages[messages.length - 1];
       if (prev?.role === 'assistant' && typeof prev.content === 'string') {
-        prev.content = prev.content
-          ? [{ type: 'text', text: prev.content }, callPart]
-          : [callPart];
+        prev.content = prev.content ? [{ type: 'text', text: prev.content }, callPart] : [callPart];
       } else if (prev?.role === 'assistant' && Array.isArray(prev.content)) {
         prev.content = [...prev.content, callPart];
       } else {
@@ -265,15 +254,12 @@ function plannerPrompt(args: PlanArgs): string {
   const parts = [amplifying ? `${PLANNER_PROMPT}\n\n${AMPLIFY_PROMPT}` : PLANNER_PROMPT];
   if (args.topic) parts.push(`Topic: ${args.topic}`);
   if (args.why) parts.push(`Why they want to learn it: ${args.why}`);
-  if (args.successLooksLike)
-    parts.push(`Success looks like: ${args.successLooksLike}`);
+  if (args.successLooksLike) parts.push(`Success looks like: ${args.successLooksLike}`);
   if (args.constraints) parts.push(`Constraints: ${args.constraints}`);
-  if (args.contextMarkdown)
-    parts.push(`Current workspace:\n${args.contextMarkdown}`);
+  if (args.contextMarkdown) parts.push(`Current workspace:\n${args.contextMarkdown}`);
   if (args.lessonHtml)
     parts.push(`Current lesson to clarify (keep its objective):\n${args.lessonHtml}`);
-  if (args.confusion)
-    parts.push(`Learner confusion to clarify in place:\n${args.confusion}`);
+  if (args.confusion) parts.push(`Learner confusion to clarify in place:\n${args.confusion}`);
   return parts.join('\n\n');
 }
 
@@ -287,8 +273,7 @@ function writerPrompt(args: WriteArgs): string {
     parts.push(AMPLIFY_PROMPT);
     parts.push(`Lesson being clarified (reuse its slug + objective):\n${args.previousLessonHtml}`);
   }
-  if (args.confusion)
-    parts.push(`Confusion to resolve:\n${args.confusion}`);
+  if (args.confusion) parts.push(`Confusion to resolve:\n${args.confusion}`);
   if (args.contextMarkdown)
     parts.push(`Current workspace (lesson index for cross-links):\n${args.contextMarkdown}`);
   return parts.join('\n\n');

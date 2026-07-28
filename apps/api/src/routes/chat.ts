@@ -11,9 +11,7 @@ export function registerChatRoutes(app: FastifyInstance, deps: Deps): void {
   app.post('/chat', async (req, reply) => {
     const parsed = ChatRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      reply
-        .code(400)
-        .send({ error: 'invalid request body', issues: parsed.error.issues });
+      reply.code(400).send({ error: 'invalid request body', issues: parsed.error.issues });
       return;
     }
 
