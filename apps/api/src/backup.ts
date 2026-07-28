@@ -2,11 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DATA_DIR = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  'data',
-);
+const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const BACKUP_PATH = join(DATA_DIR, 'backup.json');
 
 export interface BackupStore {

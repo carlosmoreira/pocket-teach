@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.angular/
+build/
+*.lock
+pnpm-lock.yaml
+design.html
+apps/api/data/

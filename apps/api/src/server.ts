@@ -74,7 +74,11 @@ async function main(): Promise<void> {
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info(
-      { provider: config.PROVIDER, plannerModel: config.PLANNER_MODEL, writerModel: config.WRITER_MODEL },
+      {
+        provider: config.PROVIDER,
+        plannerModel: config.PLANNER_MODEL,
+        writerModel: config.WRITER_MODEL,
+      },
       'pocket-teach gateway listening',
     );
   } catch (err) {

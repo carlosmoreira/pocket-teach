@@ -1,8 +1,5 @@
 import { z } from 'zod';
-import {
-  ReadLessonToolCallSchema,
-  ReadLessonToolResultSchema,
-} from './chat.js';
+import { ReadLessonToolCallSchema, ReadLessonToolResultSchema } from './chat.js';
 
 export const GenerateProjectRequestSchema = z.object({
   topic: z.string().min(1),
@@ -41,17 +38,13 @@ export const ReadLessonCallChatMessageSchema = z.object({
   type: z.literal('tool_call'),
   call: ReadLessonToolCallSchema,
 });
-export type ReadLessonCallChatMessage = z.infer<
-  typeof ReadLessonCallChatMessageSchema
->;
+export type ReadLessonCallChatMessage = z.infer<typeof ReadLessonCallChatMessageSchema>;
 
 export const ReadLessonResultChatMessageSchema = z.object({
   type: z.literal('tool_result'),
   result: ReadLessonToolResultSchema,
 });
-export type ReadLessonResultChatMessage = z.infer<
-  typeof ReadLessonResultChatMessageSchema
->;
+export type ReadLessonResultChatMessage = z.infer<typeof ReadLessonResultChatMessageSchema>;
 
 export const ChatMessageSchema = z.discriminatedUnion('type', [
   TextChatMessageSchema,

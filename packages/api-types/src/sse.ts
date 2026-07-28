@@ -2,14 +2,7 @@ import { z } from 'zod';
 import { LessonPlanSchema } from './lesson-plan.js';
 import { TeachMetaSchema } from './teach-meta.js';
 
-export const PhaseSchema = z.enum([
-  'planning',
-  'researching',
-  'plan',
-  'writing',
-  'done',
-  'error',
-]);
+export const PhaseSchema = z.enum(['planning', 'researching', 'plan', 'writing', 'done', 'error']);
 export type Phase = z.infer<typeof PhaseSchema>;
 
 export const PhaseEventSchema = z.object({

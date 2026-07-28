@@ -19,6 +19,19 @@
     "build:frontend": "pnpm --filter frontend build",
     "start": "pnpm --filter api start",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r build"
+    "typecheck": "pnpm -r build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs,json,md,yaml,yml,html,css}": "prettier --write"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.9.6"
   }
 }
