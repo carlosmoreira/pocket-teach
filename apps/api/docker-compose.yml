@@ -1,10 +1,10 @@
 services:
-  gateway:
+  api:
     build:
       # Repo root — the pnpm workspace needs api-types in context.
       context: ../..
-      dockerfile: apps/gateway/Dockerfile
-    image: pocket-teach-gateway
+      dockerfile: apps/api/Dockerfile
+    image: pocket-teach-api
     env_file: .env
     environment:
       PORT: ${PORT:-8787}
@@ -12,5 +12,5 @@ services:
       - '${PORT:-8787}:${PORT:-8787}'
     volumes:
       # Persist the backup blob store across restarts.
-      - ./data:/app/apps/gateway/data
+      - ./data:/app/apps/api/data
     restart: unless-stopped

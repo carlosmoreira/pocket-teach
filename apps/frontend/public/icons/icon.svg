@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Pocket Teach">
+  <rect width="512" height="512" rx="112" fill="#5b5bd6" />
+  <path d="M256 132 116 196v120c0 8 4 15 11 18l124 58c3 2 7 2 10 0l124-58c7-3 11-10 11-18V196L256 132Z" fill="#ffffff" opacity="0.14" />
+  <path d="M256 128 108 192l148 64 148-64-148-64Z" fill="#ffffff" />
+  <path d="M168 240v78c0 20 40 42 88 42s88-22 88-42v-78l-88 38-88-38Z" fill="#ffffff" opacity="0.82" />
+  <path d="M404 192v96" stroke="#ffffff" stroke-width="14" stroke-linecap="round" />
+  <circle cx="404" cy="300" r="16" fill="#2dd4bf" />
+</svg>

@@ -10,11 +10,11 @@ WORKDIR /app
 FROM base AS build
 COPY pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/api-types/package.json packages/api-types/
-COPY apps/gateway/package.json apps/gateway/
+COPY apps/api/package.json apps/api/
 RUN pnpm install
 COPY packages ./packages
 COPY apps ./apps
-RUN pnpm --filter gateway build
+RUN pnpm --filter api build
 
 # ---- runtime: slim, non-root ----------------------------------------------
 FROM base AS runtime
@@ -22,7 +22,7 @@ ENV NODE_ENV=production
 RUN apk add --no-cache curl \
   && addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app /app
-WORKDIR /app/apps/gateway
+WORKDIR /app/apps/api
 USER app
 EXPOSE 8787
 

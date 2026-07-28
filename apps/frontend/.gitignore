@@ -1,0 +1,20 @@
+# Compiled output
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# Node
+/node_modules
+
+# Angular cache
+/.angular/cache
+.sass-cache/
+
+# Misc
+/coverage
+testem.log
+
+# System files
+.DS_Store
+Thumbs.db
