@@ -1,10 +1,23 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import {
+  type ErrorEvent,
+  type GenerateProjectRequest,
+  type SseEvent,
+  SseEventSchema,
+} from '@pocket-teach/api-types';
 import { SettingsService } from '../core/settings/settings.service';
 
 export interface HealthResponse {
   status: string;
+}
+
+export interface GenerateProjectInput {
+  topic: string;
+  why?: string;
+  successLooksLike?: string;
+  constraints?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -16,6 +29,61 @@ export class GatewayService {
     return firstValueFrom(
       this.http.get<HealthResponse>(this.url('/health'), { headers: this.authHeaders() }),
     );
+  }
+
+  generateProject(
+    input: GenerateProjectInput,
+    requestId: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<SseEvent> {
+    const body: GenerateProjectRequest = { ...input, requestId };
+    return this.streamSse('/generate/project', body, signal);
+  }
+
+  private async *streamSse(
+    path: string,
+    body: unknown,
+    signal?: AbortSignal,
+  ): AsyncGenerator<SseEvent> {
+    let response: Response;
+    try {
+      response = await fetch(this.url(path), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...this.authRecord() },
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch {
+      if (signal?.aborted) return;
+      yield errorEvent(NETWORK_MESSAGE);
+      return;
+    }
+
+    if (!response.ok || !response.body) {
+      yield errorEvent(await httpErrorMessage(response));
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let sep: number;
+        while ((sep = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          const event = parseSseFrame(frame);
+          if (event) yield event;
+        }
+      }
+    } catch {
+      if (signal?.aborted) return;
+      yield errorEvent(NETWORK_MESSAGE);
+    }
   }
 
   private url(path: string): string {
@@ -30,4 +98,49 @@ export class GatewayService {
     if (token) headers = headers.set('Authorization', `Bearer ${token}`);
     return headers;
   }
+
+  private authRecord(): Record<string, string> {
+    const token = this.settings.bearerToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+}
+
+const NETWORK_MESSAGE = 'Could not reach the gateway. Check the URL and that it is running.';
+
+function parseSseFrame(frame: string): SseEvent | null {
+  const dataLines: string[] = [];
+  for (const line of frame.split('\n')) {
+    if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+  }
+  if (dataLines.length === 0) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(dataLines.join('\n'));
+  } catch {
+    return null;
+  }
+  const result = SseEventSchema.safeParse(parsed);
+  return result.success ? result.data : null;
+}
+
+function errorEvent(message: string): ErrorEvent {
+  return { type: 'error', message };
+}
+
+async function httpErrorMessage(response: Response): Promise<string> {
+  if (response.status === 401 || response.status === 403) {
+    return 'Gateway rejected the token (unauthorized).';
+  }
+  let detail = '';
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === 'object' && 'error' in body) {
+      const value = (body as { error: unknown }).error;
+      if (typeof value === 'string') detail = ` — ${value}`;
+    }
+  } catch {
+    /* body was not JSON */
+  }
+  return `Gateway responded with HTTP ${response.status}${detail}.`;
 }
