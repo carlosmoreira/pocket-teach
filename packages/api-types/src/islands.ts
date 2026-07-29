@@ -10,6 +10,7 @@ export const ProposalSchema = z
     rationale: z.string().min(1),
     targetSlug: z.string().min(1).optional(),
     focus: z.string().min(1).optional(),
+    confirmed: z.boolean().optional(),
   })
   .superRefine((proposal, ctx) => {
     if (proposal.kind !== 'amplify') return;

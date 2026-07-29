@@ -189,16 +189,24 @@ export class TeacherChatComponent implements OnInit {
     this.streaming.set('');
     try {
       const { text: answer, proposal } = await this.runChat();
+      if (proposal) await this.clearPendingProposals();
       if (answer || proposal) {
-        await this.appendMessage(
+        const message = await this.appendMessage(
           'assistant',
           answer || 'Ready for the next lesson whenever you are.',
           proposal,
         );
+        if (proposal?.confirmed) void this.createLesson(message);
       }
     } finally {
       this.streaming.set('');
       this.sending.set(false);
+    }
+  }
+
+  private async clearPendingProposals(): Promise<void> {
+    for (const message of this.messages()) {
+      if (message.proposal) await this.clearProposal(message);
     }
   }
 
@@ -213,7 +221,9 @@ export class TeacherChatComponent implements OnInit {
     this.genPlan.set(null);
     this.genError.set(null);
 
-    const context = buildContextMarkdown(this.project(), this.lessons(), this.records);
+    const context = buildContextMarkdown(this.project(), this.lessons(), this.records, {
+      requested: message.proposal,
+    });
     for await (const event of this.gateway.generateLesson(context, this.genRequestId)) {
       switch (event.type) {
         case 'phase':
@@ -251,7 +261,7 @@ export class TeacherChatComponent implements OnInit {
     const history: ChatMessage[] = this.messages().map((m) => ({
       type: 'text',
       role: m.role,
-      content: m.content,
+      content: m.proposal ? `${m.content}\n\n${proposalIsland(m.proposal)}` : m.content,
     }));
 
     let display = '';
@@ -294,7 +304,7 @@ export class TeacherChatComponent implements OnInit {
     role: 'user' | 'assistant',
     content: string,
     proposal?: Proposal,
-  ): Promise<void> {
+  ): Promise<Message> {
     const message: Message = {
       id: crypto.randomUUID(),
       projectId: this.project().id,
@@ -305,7 +315,12 @@ export class TeacherChatComponent implements OnInit {
     };
     await this.db.addMessage(message);
     this.messages.update((list) => [...list, message]);
+    return message;
   }
+}
+
+function proposalIsland(proposal: Proposal): string {
+  return `<script type="application/json" id="proposal">${JSON.stringify(proposal)}</script>`;
 }
 
 const ISLAND = `<script[^>]*\\bid=["'](?:proposal|record)["'][\\s\\S]*?<\\/script>`;
