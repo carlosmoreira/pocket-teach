@@ -1,4 +1,4 @@
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 // Hijack the reply so Fastify won't serialize a response. Every write is guarded
 // so a client disconnect — after which Node keeps the handler running — can't
@@ -10,14 +10,20 @@ export interface SseStream {
   readonly closed: boolean;
 }
 
-export function startSse(reply: FastifyReply): SseStream {
+export function startSse(reply: FastifyReply, req: FastifyRequest): SseStream {
   reply.hijack();
   const raw = reply.raw;
+
+  // hijack bypasses @fastify/cors' reply hooks, so echo the origin here to
+  // mirror the gateway's reflect-any-origin policy on the streamed response.
+  const origin = req.headers.origin ?? '*';
 
   raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
+    'Access-Control-Allow-Origin': origin,
+    Vary: 'Origin',
     // Disable proxy buffering (nginx) so frames flush immediately.
     'X-Accel-Buffering': 'no',
   });
