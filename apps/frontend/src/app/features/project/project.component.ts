@@ -4,10 +4,11 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowLeft } from '@ng-icons/lucide';
 import { DbService } from '../../data/db.service';
 import type { Lesson, Project } from '../../data/models';
+import { TeacherChatComponent } from './teacher-chat.component';
 
 @Component({
   selector: 'app-project',
-  imports: [RouterLink, NgIcon],
+  imports: [RouterLink, NgIcon, TeacherChatComponent],
   viewProviders: [provideIcons({ lucideArrowLeft })],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
@@ -74,6 +75,8 @@ import type { Lesson, Project } from '../../data/models';
               </a>
             }
           </section>
+
+          <app-teacher-chat [project]="p" [lessons]="lessons()" />
         } @else if (loaded()) {
           <p class="text-sm" style="color:var(--muted)">Project not found.</p>
         }

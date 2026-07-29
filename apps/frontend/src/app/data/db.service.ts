@@ -74,6 +74,24 @@ export class DbService extends Dexie {
     return this.lessons.get(id);
   }
 
+  async getLessonBySlug(projectId: string, slug: string): Promise<Lesson | undefined> {
+    const matches = await this.lessons.where('slug').equals(slug).toArray();
+    return matches.find((lesson) => lesson.projectId === projectId);
+  }
+
+  async listLearningRecords(projectId: string): Promise<LearningRecord[]> {
+    const records = await this.learningRecords.where('projectId').equals(projectId).toArray();
+    return records.sort((a, b) => a.seq - b.seq);
+  }
+
+  async listMessages(projectId: string): Promise<Message[]> {
+    return this.messages.where('projectId').equals(projectId).sortBy('createdAt');
+  }
+
+  async addMessage(message: Message): Promise<void> {
+    await this.messages.add(message);
+  }
+
   async saveGeneratedProject(mission: ProjectMission, done: DoneEvent): Promise<SavedGeneration> {
     const projectId = crypto.randomUUID();
     const lessonId = crypto.randomUUID();
