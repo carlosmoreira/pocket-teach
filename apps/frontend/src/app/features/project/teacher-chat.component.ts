@@ -27,7 +27,7 @@ const MAX_CHAT_STEPS = 6;
             [class.self-start]="message.role === 'assistant'"
             [style]="message.role === 'user' ? userBubble : teacherBubble"
           >
-            {{ message.content }}
+            {{ display(message.content) }}
           </div>
 
           @if (message.proposal; as proposal) {
@@ -170,6 +170,10 @@ export class TeacherChatComponent implements OnInit {
     this.records = await this.db.listLearningRecords(projectId);
   }
 
+  protected display(content: string): string {
+    return visibleText(content);
+  }
+
   protected onEnter(event: Event): void {
     const keyboard = event as KeyboardEvent;
     if (keyboard.shiftKey) return;
@@ -258,11 +262,14 @@ export class TeacherChatComponent implements OnInit {
 
   private async runChat(): Promise<{ text: string; proposal?: Proposal }> {
     const context = buildContextMarkdown(this.project(), this.lessons(), this.records);
-    const history: ChatMessage[] = this.messages().map((m) => ({
-      type: 'text',
-      role: m.role,
-      content: m.proposal ? `${m.content}\n\n${proposalIsland(m.proposal)}` : m.content,
-    }));
+    const history: ChatMessage[] = this.messages().map((m) => {
+      const clean = visibleText(m.content);
+      return {
+        type: 'text',
+        role: m.role,
+        content: m.proposal ? `${clean}\n\n${proposalIsland(m.proposal)}` : clean,
+      };
+    });
 
     let display = '';
     let proposal: Proposal | undefined;
