@@ -76,7 +76,7 @@ import { TeacherChatComponent } from './teacher-chat.component';
             }
           </section>
 
-          <app-teacher-chat [project]="p" [lessons]="lessons()" />
+          <app-teacher-chat [project]="p" [lessons]="lessons()" (lessonCreated)="reload()" />
         } @else if (loaded()) {
           <p class="text-sm" style="color:var(--muted)">Project not found.</p>
         }
@@ -94,10 +94,14 @@ export class ProjectComponent implements OnInit {
   protected readonly loaded = signal(false);
 
   async ngOnInit(): Promise<void> {
+    await this.reload();
+    this.loaded.set(true);
+  }
+
+  protected async reload(): Promise<void> {
     const id = this.id();
     this.project.set(await this.db.getProject(id));
     this.lessons.set(await this.db.listLessons(id));
-    this.loaded.set(true);
   }
 
   protected pad(seq: number): string {

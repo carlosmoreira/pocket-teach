@@ -5,6 +5,7 @@ import type {
   ChatEvent,
   ChatRequest,
   ErrorEvent,
+  GenerateLessonRequest,
   GenerateProjectRequest,
   SseEvent,
 } from '@pocket-teach/api-types';
@@ -39,6 +40,15 @@ export class GatewayService {
   ): AsyncGenerator<SseEvent> {
     const body: GenerateProjectRequest = { ...input, requestId };
     return this.streamEvents('/generate/project', body, parseSseFrame, sseError, signal);
+  }
+
+  generateLesson(
+    contextMarkdown: string,
+    requestId: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<SseEvent> {
+    const body: GenerateLessonRequest = { contextMarkdown, requestId };
+    return this.streamEvents('/generate/lesson', body, parseSseFrame, sseError, signal);
   }
 
   chat(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<ChatEvent> {
