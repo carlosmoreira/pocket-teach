@@ -1,7 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ErrorEvent, GenerateProjectRequest, SseEvent } from '@pocket-teach/api-types';
+import type {
+  ChatEvent,
+  ChatRequest,
+  ErrorEvent,
+  GenerateProjectRequest,
+  SseEvent,
+} from '@pocket-teach/api-types';
 import { SettingsService } from '../core/settings/settings.service';
 
 export interface HealthResponse {
@@ -32,14 +38,20 @@ export class GatewayService {
     signal?: AbortSignal,
   ): AsyncGenerator<SseEvent> {
     const body: GenerateProjectRequest = { ...input, requestId };
-    return this.streamSse('/generate/project', body, signal);
+    return this.streamEvents('/generate/project', body, parseSseFrame, sseError, signal);
   }
 
-  private async *streamSse(
+  chat(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<ChatEvent> {
+    return this.streamEvents('/chat', request, parseChatFrame, chatError, signal);
+  }
+
+  private async *streamEvents<T>(
     path: string,
     body: unknown,
+    parse: (frame: string) => T | null,
+    errorFor: (message: string) => T,
     signal?: AbortSignal,
-  ): AsyncGenerator<SseEvent> {
+  ): AsyncGenerator<T> {
     let response: Response;
     try {
       response = await fetch(this.url(path), {
@@ -50,12 +62,12 @@ export class GatewayService {
       });
     } catch {
       if (signal?.aborted) return;
-      yield errorEvent(NETWORK_MESSAGE);
+      yield errorFor(NETWORK_MESSAGE);
       return;
     }
 
     if (!response.ok || !response.body) {
-      yield errorEvent(await httpErrorMessage(response));
+      yield errorFor(await httpErrorMessage(response));
       return;
     }
 
@@ -71,13 +83,13 @@ export class GatewayService {
         while ((sep = buffer.indexOf('\n\n')) !== -1) {
           const frame = buffer.slice(0, sep);
           buffer = buffer.slice(sep + 2);
-          const event = parseSseFrame(frame);
+          const event = parse(frame);
           if (event) yield event;
         }
       }
     } catch {
       if (signal?.aborted) return;
-      yield errorEvent(NETWORK_MESSAGE);
+      yield errorFor(NETWORK_MESSAGE);
     }
   }
 
@@ -102,26 +114,45 @@ export class GatewayService {
 
 const NETWORK_MESSAGE = 'Could not reach the gateway. Check the URL and that it is running.';
 
-function parseSseFrame(frame: string): SseEvent | null {
+function frameData(frame: string): unknown {
   const dataLines: string[] = [];
   for (const line of frame.split('\n')) {
     if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
   }
-  if (dataLines.length === 0) return null;
-
-  let parsed: unknown;
+  if (dataLines.length === 0) return undefined;
   try {
-    parsed = JSON.parse(dataLines.join('\n'));
+    return JSON.parse(dataLines.join('\n'));
   } catch {
-    return null;
+    return undefined;
   }
+}
+
+function frameType(parsed: unknown): string | null {
   if (!parsed || typeof parsed !== 'object' || !('type' in parsed)) return null;
-  const type = (parsed as { type: unknown }).type;
+  return String((parsed as { type: unknown }).type);
+}
+
+function parseSseFrame(frame: string): SseEvent | null {
+  const parsed = frameData(frame);
+  const type = frameType(parsed);
   if (type !== 'phase' && type !== 'plan' && type !== 'done' && type !== 'error') return null;
   return parsed as SseEvent;
 }
 
-function errorEvent(message: string): ErrorEvent {
+const CHAT_EVENT_TYPES = ['message', 'tool_call', 'proposal', 'record', 'done', 'error'];
+
+function parseChatFrame(frame: string): ChatEvent | null {
+  const parsed = frameData(frame);
+  const type = frameType(parsed);
+  if (type === null || !CHAT_EVENT_TYPES.includes(type)) return null;
+  return parsed as ChatEvent;
+}
+
+function sseError(message: string): ErrorEvent {
+  return { type: 'error', message };
+}
+
+function chatError(message: string): ChatEvent {
   return { type: 'error', message };
 }
 
