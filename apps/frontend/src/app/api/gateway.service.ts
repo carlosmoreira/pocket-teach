@@ -1,12 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import {
-  type ErrorEvent,
-  type GenerateProjectRequest,
-  type SseEvent,
-  SseEventSchema,
-} from '@pocket-teach/api-types';
+import type { ErrorEvent, GenerateProjectRequest, SseEvent } from '@pocket-teach/api-types';
 import { SettingsService } from '../core/settings/settings.service';
 
 export interface HealthResponse {
@@ -120,8 +115,10 @@ function parseSseFrame(frame: string): SseEvent | null {
   } catch {
     return null;
   }
-  const result = SseEventSchema.safeParse(parsed);
-  return result.success ? result.data : null;
+  if (!parsed || typeof parsed !== 'object' || !('type' in parsed)) return null;
+  const type = (parsed as { type: unknown }).type;
+  if (type !== 'phase' && type !== 'plan' && type !== 'done' && type !== 'error') return null;
+  return parsed as SseEvent;
 }
 
 function errorEvent(message: string): ErrorEvent {
