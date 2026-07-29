@@ -15,7 +15,7 @@ export function registerChatRoutes(app: FastifyInstance, deps: Deps): void {
       return;
     }
 
-    const sse = startSse(reply);
+    const sse = startSse(reply, req);
     try {
       for await (const event of deps.provider.chat(parsed.data)) {
         sse.event(event.type, event satisfies ChatEvent);

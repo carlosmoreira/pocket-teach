@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodError } from 'zod';
 import {
   GenerateAmplifyRequestSchema,
@@ -22,11 +22,12 @@ function badRequest(reply: FastifyReply, error: ZodError): void {
 async function handleGeneration(
   app: FastifyInstance,
   deps: Deps,
+  req: FastifyRequest,
   reply: FastifyReply,
   requestId: string,
   planArgs: PlanArgs,
 ): Promise<void> {
-  const sse = startSse(reply);
+  const sse = startSse(reply, req);
   try {
     const { cached, value } = await deps.cache.withIdempotency<GenerationResult>(requestId, () =>
       generateFresh(sse, deps.provider, planArgs),
@@ -48,7 +49,7 @@ export function registerGenerateRoutes(app: FastifyInstance, deps: Deps): void {
     const parsed = GenerateProjectRequestSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, parsed.error);
     const b = parsed.data;
-    await handleGeneration(app, deps, reply, b.requestId, {
+    await handleGeneration(app, deps, req, reply, b.requestId, {
       contextMarkdown: '',
       topic: b.topic,
       why: b.why,
@@ -61,7 +62,7 @@ export function registerGenerateRoutes(app: FastifyInstance, deps: Deps): void {
     const parsed = GenerateLessonRequestSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, parsed.error);
     const b = parsed.data;
-    await handleGeneration(app, deps, reply, b.requestId, {
+    await handleGeneration(app, deps, req, reply, b.requestId, {
       contextMarkdown: b.contextMarkdown,
     });
   });
@@ -70,7 +71,7 @@ export function registerGenerateRoutes(app: FastifyInstance, deps: Deps): void {
     const parsed = GenerateAmplifyRequestSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, parsed.error);
     const b = parsed.data;
-    await handleGeneration(app, deps, reply, b.requestId, {
+    await handleGeneration(app, deps, req, reply, b.requestId, {
       contextMarkdown: b.contextMarkdown,
       lessonHtml: b.lessonHtml,
       confusion: b.confusion,
