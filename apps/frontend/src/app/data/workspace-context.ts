@@ -1,9 +1,11 @@
+import type { Proposal } from '@pocket-teach/api-types';
 import type { LearningRecord, Lesson, Project } from './models';
 
 export function buildContextMarkdown(
   project: Project,
   lessons: Lesson[],
   records: LearningRecord[],
+  options?: { requested?: Proposal },
 ): string {
   const m = project.mission;
   const mission = [`# Mission`, `Topic: ${m.topic}`];
@@ -33,6 +35,18 @@ export function buildContextMarkdown(
     ? lessons.map((l) => `- ${l.slug} · ${l.title}\n  Recap: ${l.recap}`)
     : ['(no lessons yet)'];
   sections.push(['# Lesson index', ...index].join('\n'));
+
+  const requested = options?.requested;
+  if (requested) {
+    sections.push(
+      [
+        '# Requested next lesson',
+        `The learner has agreed to this specific lesson — build it, do not pick a different topic.`,
+        `Objective: ${requested.objective}`,
+        `Rationale: ${requested.rationale}`,
+      ].join('\n'),
+    );
+  }
 
   return sections.join('\n\n');
 }

@@ -1,19 +1,20 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSend } from '@ng-icons/lucide';
-import type { ChatMessage } from '@pocket-teach/api-types';
+import { lucideSend, lucideWandSparkles } from '@ng-icons/lucide';
+import type { ChatMessage, LessonPlan, Phase, Proposal } from '@pocket-teach/api-types';
 import { DbService } from '../../data/db.service';
 import { buildContextMarkdown } from '../../data/workspace-context';
 import type { LearningRecord, Lesson, Message, Project } from '../../data/models';
 import { GatewayService } from '../../api/gateway.service';
+import { GenerationProgressComponent } from '../new-project/generation-progress.component';
 
 const MAX_CHAT_STEPS = 6;
 
 @Component({
   selector: 'app-teacher-chat',
-  imports: [FormsModule, NgIcon],
-  viewProviders: [provideIcons({ lucideSend })],
+  imports: [FormsModule, NgIcon, GenerationProgressComponent],
+  viewProviders: [provideIcons({ lucideSend, lucideWandSparkles })],
   template: `
     <section class="flex flex-col gap-3">
       <h2 class="text-sm font-bold" style="color:var(--ink)">Teacher</h2>
@@ -28,6 +29,53 @@ const MAX_CHAT_STEPS = 6;
           >
             {{ message.content }}
           </div>
+
+          @if (message.proposal; as proposal) {
+            <div
+              class="self-start w-full rounded-2xl p-3.5 flex flex-col gap-2"
+              style="background:var(--panel);border:1px solid var(--accent);box-shadow:var(--shadow)"
+            >
+              @if (generatingFor() === message.id) {
+                <app-generation-progress
+                  [phase]="genPhase()"
+                  [plan]="genPlan()"
+                  [error]="genError()"
+                  (retry)="runLessonGeneration(message)"
+                />
+              } @else {
+                <span
+                  class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
+                  style="color:var(--accent)"
+                >
+                  <ng-icon name="lucideWandSparkles" size="14" /> New lesson
+                </span>
+                <span class="text-sm font-semibold" style="color:var(--ink)">{{
+                  proposal.objective
+                }}</span>
+                <span class="text-xs" style="color:var(--muted)">{{ proposal.rationale }}</span>
+                <div class="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    (click)="createLesson(message)"
+                    [disabled]="generatingFor() !== null"
+                    class="flex-1 rounded-xl px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                    style="background:var(--accent)"
+                  >
+                    Create lesson
+                  </button>
+                  <button
+                    type="button"
+                    (click)="dismissProposal(message)"
+                    [disabled]="generatingFor() !== null"
+                    class="rounded-xl px-3.5 py-2 text-sm font-semibold disabled:opacity-40"
+                    style="background:var(--chip);color:var(--muted)"
+                  >
+                    Not now
+                  </button>
+                </div>
+              }
+            </div>
+          }
         }
 
         @if (streaming()) {
@@ -96,6 +144,7 @@ export class TeacherChatComponent implements OnInit {
 
   readonly project = input.required<Project>();
   readonly lessons = input.required<Lesson[]>();
+  readonly lessonCreated = output<void>();
 
   protected readonly messages = signal<Message[]>([]);
   protected readonly draft = signal('');
@@ -103,11 +152,17 @@ export class TeacherChatComponent implements OnInit {
   protected readonly sending = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  protected readonly generatingFor = signal<string | null>(null);
+  protected readonly genPhase = signal<Phase | null>(null);
+  protected readonly genPlan = signal<LessonPlan | null>(null);
+  protected readonly genError = signal<string | null>(null);
+
   protected readonly userBubble = 'background:var(--accent);color:#fff';
   protected readonly teacherBubble =
     'background:var(--panel);border:1px solid var(--line);color:var(--ink)';
 
   private records: LearningRecord[] = [];
+  private genRequestId = '';
 
   async ngOnInit(): Promise<void> {
     const projectId = this.project().id;
@@ -133,23 +188,84 @@ export class TeacherChatComponent implements OnInit {
     this.sending.set(true);
     this.streaming.set('');
     try {
-      const answer = await this.runChat();
-      if (answer) await this.appendMessage('assistant', answer);
+      const { text: answer, proposal } = await this.runChat();
+      if (proposal) await this.clearPendingProposals();
+      if (answer || proposal) {
+        const message = await this.appendMessage(
+          'assistant',
+          answer || 'Ready for the next lesson whenever you are.',
+          proposal,
+        );
+        if (proposal?.confirmed) void this.createLesson(message);
+      }
     } finally {
       this.streaming.set('');
       this.sending.set(false);
     }
   }
 
-  private async runChat(): Promise<string> {
+  private async clearPendingProposals(): Promise<void> {
+    for (const message of this.messages()) {
+      if (message.proposal) await this.clearProposal(message);
+    }
+  }
+
+  protected async createLesson(message: Message): Promise<void> {
+    this.genRequestId = crypto.randomUUID();
+    this.generatingFor.set(message.id);
+    await this.runLessonGeneration(message);
+  }
+
+  protected async runLessonGeneration(message: Message): Promise<void> {
+    this.genPhase.set(null);
+    this.genPlan.set(null);
+    this.genError.set(null);
+
+    const context = buildContextMarkdown(this.project(), this.lessons(), this.records, {
+      requested: message.proposal,
+    });
+    for await (const event of this.gateway.generateLesson(context, this.genRequestId)) {
+      switch (event.type) {
+        case 'phase':
+          this.genPhase.set(event.phase);
+          break;
+        case 'plan':
+          this.genPlan.set(event.plan);
+          break;
+        case 'done':
+          await this.db.saveGeneratedLesson(this.project().id, event);
+          await this.clearProposal(message);
+          this.generatingFor.set(null);
+          this.lessonCreated.emit();
+          return;
+        case 'error':
+          this.genError.set(event.message);
+          return;
+      }
+    }
+  }
+
+  protected async dismissProposal(message: Message): Promise<void> {
+    await this.clearProposal(message);
+  }
+
+  private async clearProposal(message: Message): Promise<void> {
+    await this.db.updateMessage(message.id, { proposal: undefined });
+    this.messages.update((list) =>
+      list.map((m) => (m.id === message.id ? { ...m, proposal: undefined } : m)),
+    );
+  }
+
+  private async runChat(): Promise<{ text: string; proposal?: Proposal }> {
     const context = buildContextMarkdown(this.project(), this.lessons(), this.records);
     const history: ChatMessage[] = this.messages().map((m) => ({
       type: 'text',
       role: m.role,
-      content: m.content,
+      content: m.proposal ? `${m.content}\n\n${proposalIsland(m.proposal)}` : m.content,
     }));
 
     let display = '';
+    let proposal: Proposal | undefined;
     for (let step = 0; step < MAX_CHAT_STEPS; step++) {
       let segment = '';
       let toolSlug: string | undefined;
@@ -162,6 +278,8 @@ export class TeacherChatComponent implements OnInit {
           this.streaming.set(visibleText(display));
         } else if (event.type === 'tool_call') {
           toolSlug = event.call.slug;
+        } else if (event.type === 'proposal') {
+          if (event.proposal.kind === 'new_lesson') proposal = event.proposal;
         } else if (event.type === 'error') {
           this.error.set(event.message);
           errored = true;
@@ -179,25 +297,43 @@ export class TeacherChatComponent implements OnInit {
       });
     }
 
-    return visibleText(display);
+    return { text: visibleText(display), proposal };
   }
 
-  private async appendMessage(role: 'user' | 'assistant', content: string): Promise<void> {
+  private async appendMessage(
+    role: 'user' | 'assistant',
+    content: string,
+    proposal?: Proposal,
+  ): Promise<Message> {
     const message: Message = {
       id: crypto.randomUUID(),
       projectId: this.project().id,
       role,
       content,
+      proposal,
       createdAt: new Date().toISOString(),
     };
     await this.db.addMessage(message);
     this.messages.update((list) => [...list, message]);
+    return message;
   }
 }
 
-const ISLAND_RE = /<script[^>]*\bid=["'](?:proposal|record)["'][\s\S]*?<\/script>/gi;
-const PARTIAL_ISLAND_RE = /<script\b(?:(?!<\/script>)[\s\S])*$/i;
+function proposalIsland(proposal: Proposal): string {
+  return `<script type="application/json" id="proposal">${JSON.stringify(proposal)}</script>`;
+}
+
+const ISLAND = `<script[^>]*\\bid=["'](?:proposal|record)["'][\\s\\S]*?<\\/script>`;
+const FENCED_ISLAND_RE = new RegExp('```[a-z]*\\s*' + ISLAND + '\\s*```', 'gi');
+const ISLAND_RE = new RegExp(ISLAND, 'gi');
+const EMPTY_FENCE_RE = /```[a-z]*\s*```/gi;
+const PARTIAL_ISLAND_RE = /(?:```[a-z]*\s*)?<script\b(?:(?!<\/script>)[\s\S])*$/i;
 
 function visibleText(raw: string): string {
-  return raw.replace(ISLAND_RE, '').replace(PARTIAL_ISLAND_RE, '').trim();
+  return raw
+    .replace(FENCED_ISLAND_RE, '')
+    .replace(ISLAND_RE, '')
+    .replace(EMPTY_FENCE_RE, '')
+    .replace(PARTIAL_ISLAND_RE, '')
+    .trim();
 }

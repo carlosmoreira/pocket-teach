@@ -92,6 +92,12 @@ export class DbService extends Dexie {
     await this.messages.add(message);
   }
 
+  async updateMessage(id: string, changes: Partial<Message>): Promise<void> {
+    const existing = await this.messages.get(id);
+    if (!existing) return;
+    await this.messages.put({ ...existing, ...changes });
+  }
+
   async saveGeneratedProject(mission: ProjectMission, done: DoneEvent): Promise<SavedGeneration> {
     const projectId = crypto.randomUUID();
     const lessonId = crypto.randomUUID();
@@ -126,6 +132,40 @@ export class DbService extends Dexie {
     });
 
     return { projectId, lessonId };
+  }
+
+  async saveGeneratedLesson(projectId: string, done: DoneEvent): Promise<string> {
+    const lessonId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+
+    return this.transaction('rw', this.projects, this.lessons, async () => {
+      const project = await this.projects.get(projectId);
+      if (!project) throw new Error('project not found');
+
+      const lastSeq = await this.lessons.where('projectId').equals(projectId).count();
+      const lesson: Lesson = {
+        id: lessonId,
+        projectId,
+        seq: lastSeq + 1,
+        slug: done.meta.slug,
+        title: done.meta.title,
+        primarySource: done.meta.primarySource,
+        linkedTerms: done.meta.linkedTerms,
+        recap: done.meta.recap,
+        html: done.html,
+        version: 1,
+        createdAt,
+      };
+
+      await this.lessons.add(lesson);
+      await this.projects.put({
+        ...project,
+        glossary: mergeGlossary(project.glossary, done.meta.glossaryUpdates),
+        resources: mergeResources(project.resources, done.meta.resourceUpdates),
+      });
+
+      return lessonId;
+    });
   }
 }
 
