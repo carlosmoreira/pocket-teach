@@ -41,6 +41,7 @@ const ORDER: Phase[] = ['planning', 'researching', 'plan', 'writing', 'done'];
         <div class="flex items-center gap-3 py-2.5">
           <span
             class="grid place-items-center w-7 h-7 rounded-full text-xs font-semibold shrink-0"
+            [class.pt-step-pulse]="step.status === 'now' && !error()"
             [style]="dotStyle(step)"
           >
             @switch (step.status) {
