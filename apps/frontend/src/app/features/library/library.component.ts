@@ -66,7 +66,8 @@ import type { ProjectMission } from '../../data/models';
                   {{ oneLine(summary.project.mission) }}
                 </p>
                 <span class="mt-1 text-xs font-semibold" style="color:var(--accent-2)">
-                  {{ summary.lessonCount }} {{ summary.lessonCount === 1 ? 'lesson' : 'lessons' }}
+                  {{ summary.lessonCount }} {{ summary.lessonCount === 1 ? 'lesson' : 'lessons' }} ·
+                  {{ updatedLabel(summary.project.createdAt) }}
                 </span>
               </a>
             }
@@ -76,10 +77,11 @@ import type { ProjectMission } from '../../data/models';
 
       <a
         routerLink="/new"
-        class="fixed right-5 bottom-5 flex items-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white"
+        class="fixed right-5 bottom-5 grid place-items-center w-14 h-14 rounded-2xl text-white"
         style="background:var(--accent);box-shadow:0 8px 20px rgba(91,91,214,.45)"
+        aria-label="New learning project"
       >
-        <ng-icon name="lucidePlus" size="18" /> New learning project
+        <ng-icon name="lucidePlus" size="26" />
       </a>
     </main>
   `,
@@ -97,5 +99,14 @@ export class LibraryComponent implements OnInit {
 
   protected oneLine(mission: ProjectMission): string {
     return mission.why ?? mission.successLooksLike ?? mission.topic;
+  }
+
+  protected updatedLabel(createdAt: string): string {
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000);
+    if (days <= 0) return 'updated today';
+    if (days === 1) return 'updated yesterday';
+    if (days < 7) return `updated ${days}d ago`;
+    if (days < 30) return `updated ${Math.floor(days / 7)}w ago`;
+    return `updated ${Math.floor(days / 30)}mo ago`;
   }
 }
