@@ -1,6 +1,7 @@
 import type { LessonPlan, SseEvent, TeachMeta } from '@pocket-teach/api-types';
 import type { LLMProvider, PlanArgs } from './providers/LLMProvider.js';
 import type { SseStream } from './http/sse.js';
+import { providerErrorMessage } from './providers/errorMessage.js';
 
 export interface GenerationResult {
   plan: LessonPlan;
@@ -52,9 +53,8 @@ export async function generateFresh(
 
     return { plan, html, meta };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
     emitPhase(sse, 'error');
-    sse.event('error', { type: 'error', message } satisfies SseEvent);
+    sse.event('error', { type: 'error', message: providerErrorMessage(err) } satisfies SseEvent);
     throw err;
   }
 }

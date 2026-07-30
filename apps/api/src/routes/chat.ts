@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { ChatRequestSchema, type ChatEvent } from '@pocket-teach/api-types';
 import type { LLMProvider } from '../providers/LLMProvider.js';
 import { startSse } from '../http/sse.js';
+import { providerErrorMessage } from '../providers/errorMessage.js';
 
 interface Deps {
   provider: LLMProvider;
@@ -25,7 +26,7 @@ export function registerChatRoutes(app: FastifyInstance, deps: Deps): void {
       app.log.error({ err }, 'chat failed');
       sse.event('error', {
         type: 'error',
-        message: 'chat failed',
+        message: providerErrorMessage(err),
       } satisfies ChatEvent);
     } finally {
       sse.end();
