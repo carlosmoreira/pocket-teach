@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, input, output, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSend, lucideWandSparkles } from '@ng-icons/lucide';
@@ -110,6 +110,13 @@ const MAX_CHAT_STEPS = 6;
         </p>
       }
 
+      @if (hasPendingProposal() && !generatingFor()) {
+        <p class="text-xs" style="color:var(--muted)">
+          A lesson is ready to build — tap
+          <span style="color:var(--accent);font-weight:600">Create lesson</span> above.
+        </p>
+      }
+
       <div class="sticky bottom-0 pt-2" style="background:var(--bg)">
         <div
           class="flex items-end gap-2 rounded-2xl p-2"
@@ -151,6 +158,8 @@ export class TeacherChatComponent implements OnInit {
   protected readonly streaming = signal('');
   protected readonly sending = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  protected readonly hasPendingProposal = computed(() => this.messages().some((m) => !!m.proposal));
 
   protected readonly generatingFor = signal<string | null>(null);
   protected readonly genPhase = signal<Phase | null>(null);
