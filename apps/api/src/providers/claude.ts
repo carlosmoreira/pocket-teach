@@ -1,9 +1,10 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateObject, generateText, stepCountIs, streamText, tool, type ModelMessage } from 'ai';
 import { z } from 'zod';
-import type { ChatEvent, ChatMessage, LessonPlan } from '@pocket-teach/api-types';
+import type { ChatEvent, ChatMessage, LessonPlan, Proposal } from '@pocket-teach/api-types';
 import {
   LessonPlanSchema,
+  ProposalSchema,
   extractProposal,
   extractRecord,
   extractTeachMeta,
@@ -42,6 +43,9 @@ const WEB_FETCH_MAX_USES = 5;
 
 const READ_LESSON_DESCRIPTION =
   "Fetch the full HTML body of a lesson already in this workspace, by its slug from the lesson index. Use only when a recap is not enough — when you need the lesson's exact wording, worked example, or quiz. The app serves the body and the conversation continues.";
+
+const PROPOSE_LESSON_DESCRIPTION =
+  'Offer to create or amplify a lesson, or confirm one the learner just agreed to. Calling this tool is the ONLY thing that reaches the app — do not describe a proposal in prose instead. Call with confirmed:false to offer (the app shows a confirm card); call again with confirmed:true, same objective and rationale, once the learner clearly agrees, to build it now.';
 
 const MISSING_KEY_ERROR =
   'ANTHROPIC_API_KEY is not set. The gateway starts without it, but generation and chat need a real key — set ANTHROPIC_API_KEY in the gateway environment.';
@@ -170,6 +174,20 @@ export class ClaudeProvider implements LLMProvider {
               .describe('The lesson slug from the workspace lesson index, e.g. 0003-...'),
           }),
         }),
+        propose_lesson: tool({
+          description: PROPOSE_LESSON_DESCRIPTION,
+          inputSchema: z.object({
+            kind: z.enum(['new_lesson', 'amplify']).default('new_lesson'),
+            objective: z.string().min(1).describe('the one thing the lesson will teach'),
+            rationale: z.string().min(1).describe('why this is the right step now'),
+            targetSlug: z.string().optional().describe('for amplify: the lesson slug to clarify'),
+            focus: z.string().optional().describe('for amplify: what to make clearer'),
+            confirmed: z
+              .boolean()
+              .optional()
+              .describe('true only when the learner has agreed and it should build now'),
+          }),
+        }),
       },
       stopWhen: stepCountIs(CHAT_MAX_STEPS),
       maxOutputTokens: CHAT_MAX_TOKENS,
@@ -177,19 +195,31 @@ export class ClaudeProvider implements LLMProvider {
 
     let fullText = '';
     let readLessonSlug: string | undefined;
+    let proposeInput: unknown;
     for await (const part of result.fullStream) {
       if (part.type === 'text-delta') {
         fullText += part.text;
         yield { type: 'message', delta: part.text };
       } else if (part.type === 'tool-call' && part.toolName === 'read_lesson') {
         readLessonSlug = (part.input as { slug: string }).slug;
+      } else if (part.type === 'tool-call' && part.toolName === 'propose_lesson') {
+        proposeInput = part.input;
       } else if (part.type === 'error') {
         throw part.error;
       }
     }
 
-    const proposal = extractProposal(fullText);
-    if (proposal.ok) yield { type: 'proposal', proposal: proposal.proposal };
+    // A tool call is schema-validated, so prefer it; fall back to a legacy island
+    // only if the model wrote one instead of calling the tool.
+    let proposal: Proposal | undefined;
+    if (proposeInput !== undefined) {
+      const parsed = ProposalSchema.safeParse(proposeInput);
+      if (parsed.success) proposal = parsed.data;
+    } else {
+      const island = extractProposal(fullText);
+      if (island.ok) proposal = island.proposal;
+    }
+    if (proposal) yield { type: 'proposal', proposal };
 
     const record = extractRecord(fullText);
     if (record.ok) yield { type: 'record', record: record.record };
