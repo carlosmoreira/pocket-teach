@@ -273,11 +273,10 @@ export class TeacherChatComponent implements OnInit {
     const context = buildContextMarkdown(this.project(), this.lessons(), this.records);
     const history: ChatMessage[] = this.messages().map((m) => {
       const clean = visibleText(m.content);
-      return {
-        type: 'text',
-        role: m.role,
-        content: m.proposal ? `${clean}\n\n${proposalIsland(m.proposal)}` : clean,
-      };
+      const pending = m.proposal
+        ? `${clean}\n\n[You have an unconfirmed offer on the table — objective: "${m.proposal.objective}". If the learner agrees, confirm it.]`
+        : clean;
+      return { type: 'text', role: m.role, content: pending };
     });
 
     let display = '';
@@ -333,10 +332,6 @@ export class TeacherChatComponent implements OnInit {
     this.messages.update((list) => [...list, message]);
     return message;
   }
-}
-
-function proposalIsland(proposal: Proposal): string {
-  return `<script type="application/json" id="proposal">${JSON.stringify(proposal)}</script>`;
 }
 
 const ISLAND = `<script[^>]*\\bid=["'](?:proposal|record)["'][\\s\\S]*?<\\/script>`;
