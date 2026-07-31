@@ -1,4 +1,15 @@
-import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -8,12 +19,11 @@ import {
   lucideTriangleAlert,
   lucideWandSparkles,
 } from '@ng-icons/lucide';
-import type { ChatMessage, LessonPlan, Phase, Proposal } from '@pocket-teach/api-types';
+import type { ChatMessage, Phase, Proposal } from '@pocket-teach/api-types';
 import { DbService } from '../../data/db.service';
 import { buildContextMarkdown } from '../../data/workspace-context';
 import type { LearningRecord, Lesson, Message, Project } from '../../data/models';
 import { GatewayService } from '../../api/gateway.service';
-import { GenerationProgressComponent } from '../new-project/generation-progress.component';
 
 const MAX_CHAT_STEPS = 6;
 
@@ -28,7 +38,7 @@ const PHASE_LABELS: Record<string, string> = {
 
 @Component({
   selector: 'app-teacher-chat',
-  imports: [FormsModule, NgIcon, GenerationProgressComponent],
+  imports: [FormsModule, NgIcon],
   viewProviders: [
     provideIcons({
       lucideSend,
@@ -42,7 +52,7 @@ const PHASE_LABELS: Record<string, string> = {
     <section class="flex flex-col gap-3">
       <h2 class="text-sm font-bold" style="color:var(--ink)">Teacher</h2>
 
-      <div class="flex flex-col gap-2.5">
+      <div #scrollBox class="flex flex-col gap-2.5 max-h-[55vh] overflow-y-auto pb-1">
         @for (message of messages(); track message.id) {
           <div
             class="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap"
@@ -54,18 +64,11 @@ const PHASE_LABELS: Record<string, string> = {
           </div>
 
           @if (message.proposal; as proposal) {
-            <div
-              class="self-start w-full rounded-2xl p-3.5 flex flex-col gap-2"
-              style="background:var(--panel);border:1px solid var(--accent);box-shadow:var(--shadow)"
-            >
-              @if (generatingFor() === message.id) {
-                <app-generation-progress
-                  [phase]="genPhase()"
-                  [plan]="genPlan()"
-                  [error]="genError()"
-                  (retry)="runLessonGeneration(message)"
-                />
-              } @else {
+            @if (generatingFor() !== message.id) {
+              <div
+                class="self-start w-full rounded-2xl p-3.5 flex flex-col gap-2"
+                style="background:var(--panel);border:1px solid var(--accent);box-shadow:var(--shadow)"
+              >
                 <span
                   class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
                   style="color:var(--accent)"
@@ -96,8 +99,8 @@ const PHASE_LABELS: Record<string, string> = {
                     Not now
                   </button>
                 </div>
-              }
-            </div>
+              </div>
+            }
           }
         }
 
@@ -133,7 +136,7 @@ const PHASE_LABELS: Record<string, string> = {
         </p>
       }
 
-      <div class="sticky bottom-0 pt-2 flex flex-col gap-2" style="background:var(--bg)">
+      <div class="pt-1 flex flex-col gap-2">
         @if (generatingFor()) {
           @if (genError(); as message) {
             <div
@@ -230,15 +233,26 @@ export class TeacherChatComponent implements OnInit {
     return this.messages().find((m) => m.id === id)?.proposal?.objective ?? null;
   });
   protected readonly genPhase = signal<Phase | null>(null);
-  protected readonly genPlan = signal<LessonPlan | null>(null);
   protected readonly genError = signal<string | null>(null);
 
   protected readonly userBubble = 'background:var(--accent);color:#fff';
   protected readonly teacherBubble =
     'background:var(--panel);border:1px solid var(--line);color:var(--ink)';
 
+  private readonly scrollBox = viewChild<ElementRef<HTMLDivElement>>('scrollBox');
   private records: LearningRecord[] = [];
   private genRequestId = '';
+
+  constructor() {
+    effect(() => {
+      this.messages();
+      this.streaming();
+      this.sending();
+      this.genPhase();
+      const el = this.scrollBox()?.nativeElement;
+      if (el) queueMicrotask(() => (el.scrollTop = el.scrollHeight));
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     const projectId = this.project().id;
@@ -308,7 +322,6 @@ export class TeacherChatComponent implements OnInit {
 
   protected async runLessonGeneration(message: Message): Promise<void> {
     this.genPhase.set(null);
-    this.genPlan.set(null);
     this.genError.set(null);
 
     const context = buildContextMarkdown(this.project(), this.lessons(), this.records, {
@@ -318,9 +331,6 @@ export class TeacherChatComponent implements OnInit {
       switch (event.type) {
         case 'phase':
           this.genPhase.set(event.phase);
-          break;
-        case 'plan':
-          this.genPlan.set(event.plan);
           break;
         case 'done':
           await this.db.saveGeneratedLesson(this.project().id, event);
