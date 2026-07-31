@@ -1,7 +1,13 @@
 import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSend, lucideWandSparkles } from '@ng-icons/lucide';
+import {
+  lucideLoaderCircle,
+  lucideRotateCcw,
+  lucideSend,
+  lucideTriangleAlert,
+  lucideWandSparkles,
+} from '@ng-icons/lucide';
 import type { ChatMessage, LessonPlan, Phase, Proposal } from '@pocket-teach/api-types';
 import { DbService } from '../../data/db.service';
 import { buildContextMarkdown } from '../../data/workspace-context';
@@ -11,10 +17,27 @@ import { GenerationProgressComponent } from '../new-project/generation-progress.
 
 const MAX_CHAT_STEPS = 6;
 
+const PHASE_LABELS: Record<string, string> = {
+  planning: 'reading your workspace…',
+  researching: 'grounding in trusted sources…',
+  plan: 'plan ready…',
+  writing: 'writing the lesson…',
+  done: 'saving…',
+  error: '',
+};
+
 @Component({
   selector: 'app-teacher-chat',
   imports: [FormsModule, NgIcon, GenerationProgressComponent],
-  viewProviders: [provideIcons({ lucideSend, lucideWandSparkles })],
+  viewProviders: [
+    provideIcons({
+      lucideSend,
+      lucideWandSparkles,
+      lucideLoaderCircle,
+      lucideTriangleAlert,
+      lucideRotateCcw,
+    }),
+  ],
   template: `
     <section class="flex flex-col gap-3">
       <h2 class="text-sm font-bold" style="color:var(--ink)">Teacher</h2>
@@ -110,14 +133,53 @@ const MAX_CHAT_STEPS = 6;
         </p>
       }
 
-      @if (hasPendingProposal() && !generatingFor()) {
-        <p class="text-xs" style="color:var(--muted)">
-          A lesson is ready to build — tap
-          <span style="color:var(--accent);font-weight:600">Create lesson</span> above.
-        </p>
-      }
+      <div class="sticky bottom-0 pt-2 flex flex-col gap-2" style="background:var(--bg)">
+        @if (generatingFor()) {
+          @if (genError(); as message) {
+            <div
+              class="flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5"
+              style="background:color-mix(in srgb,var(--warn) 12%,var(--panel));border:1px solid var(--warn)"
+            >
+              <ng-icon name="lucideTriangleAlert" size="18" style="color:var(--warn)" />
+              <span class="flex-1 text-sm" style="color:var(--warn)">{{ message }}</span>
+              <button
+                type="button"
+                (click)="retryGeneration()"
+                class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shrink-0"
+                style="background:var(--accent)"
+              >
+                <ng-icon name="lucideRotateCcw" size="14" /> Retry
+              </button>
+            </div>
+          } @else {
+            <div
+              class="flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5"
+              style="background:color-mix(in srgb,var(--accent) 10%,var(--panel));border:1px solid var(--accent)"
+            >
+              <ng-icon
+                name="lucideLoaderCircle"
+                size="18"
+                class="animate-spin"
+                style="color:var(--accent)"
+              />
+              <span class="flex flex-col min-w-0">
+                <span class="text-sm font-semibold" style="color:var(--ink)"
+                  >Creating your lesson…
+                  <span style="color:var(--muted);font-weight:400">{{ genPhaseLabel() }}</span>
+                </span>
+                @if (generatingObjective(); as obj) {
+                  <span class="text-xs truncate" style="color:var(--muted)">{{ obj }}</span>
+                }
+              </span>
+            </div>
+          }
+        } @else if (hasPendingProposal()) {
+          <p class="text-xs" style="color:var(--muted)">
+            A lesson is ready to build — tap
+            <span style="color:var(--accent);font-weight:600">Create lesson</span> above.
+          </p>
+        }
 
-      <div class="sticky bottom-0 pt-2" style="background:var(--bg)">
         <div
           class="flex items-end gap-2 rounded-2xl p-2"
           style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
@@ -162,6 +224,11 @@ export class TeacherChatComponent implements OnInit {
   protected readonly hasPendingProposal = computed(() => this.messages().some((m) => !!m.proposal));
 
   protected readonly generatingFor = signal<string | null>(null);
+  protected readonly generatingObjective = computed(() => {
+    const id = this.generatingFor();
+    if (!id) return null;
+    return this.messages().find((m) => m.id === id)?.proposal?.objective ?? null;
+  });
   protected readonly genPhase = signal<Phase | null>(null);
   protected readonly genPlan = signal<LessonPlan | null>(null);
   protected readonly genError = signal<string | null>(null);
@@ -181,6 +248,16 @@ export class TeacherChatComponent implements OnInit {
 
   protected display(content: string): string {
     return visibleText(content);
+  }
+
+  protected genPhaseLabel(): string {
+    return PHASE_LABELS[this.genPhase() ?? 'planning'] ?? 'starting…';
+  }
+
+  protected async retryGeneration(): Promise<void> {
+    const id = this.generatingFor();
+    const message = id ? this.messages().find((m) => m.id === id) : undefined;
+    if (message) await this.createLesson(message);
   }
 
   protected onEnter(event: Event): void {
@@ -206,7 +283,7 @@ export class TeacherChatComponent implements OnInit {
       if (answer || proposal) {
         const message = await this.appendMessage(
           'assistant',
-          answer || 'Ready for the next lesson whenever you are.',
+          answer || fallbackText(proposal),
           proposal,
         );
         if (proposal?.confirmed) void this.createLesson(message);
@@ -347,4 +424,10 @@ function visibleText(raw: string): string {
     .replace(EMPTY_FENCE_RE, '')
     .replace(PARTIAL_ISLAND_RE, '')
     .trim();
+}
+
+function fallbackText(proposal?: Proposal): string {
+  if (proposal?.confirmed) return 'Putting that lesson together now…';
+  if (proposal) return "Here's a lesson I'd suggest:";
+  return 'Ready for the next lesson whenever you are.';
 }
