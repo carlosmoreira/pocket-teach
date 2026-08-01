@@ -186,11 +186,21 @@ function ensureTrailingNewline(content: string): string {
 }
 
 function titleFromMission(mission: string): string {
-  const line = mission
-    .split('\n')
-    .map((l) => l.replace(/^#+\s*/, '').trim())
-    .find((l) => l.length > 0);
-  return line || 'Untitled project';
+  const lines = mission.split('\n').map((l) => l.trim());
+  // "Topic: X"
+  for (const line of lines) {
+    const inline = /^topic:\s*(.+)$/i.exec(line);
+    if (inline) return inline[1].trim();
+  }
+  // A "## Topic" heading followed by its value on the next content line.
+  const topicHeading = lines.findIndex((l) => /^#+\s*topic\b/i.test(l));
+  if (topicHeading !== -1) {
+    const value = lines.slice(topicHeading + 1).find((l) => l.length > 0 && !l.startsWith('#'));
+    if (value) return value;
+  }
+  // Otherwise the first non-heading, non-empty line.
+  const first = lines.find((l) => l.length > 0 && !l.startsWith('#'));
+  return first || 'Untitled project';
 }
 
 function pad4(n: number): string {

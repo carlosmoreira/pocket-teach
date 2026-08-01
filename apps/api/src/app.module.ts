@@ -7,6 +7,7 @@ import { ProvidersModule } from './providers/providers.module';
 import { SearchModule } from './search/search.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { TeachingModule } from './teaching/teaching.module';
+import { ProjectsModule } from './projects/projects.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TeachingModule } from './teaching/teaching.module';
     SearchModule,
     WorkspaceModule,
     TeachingModule,
+    ProjectsModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
