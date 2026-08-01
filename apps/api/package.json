@@ -2,29 +2,29 @@
   "name": "api",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
-  "description": "Pocket Teach generation gateway — a thin, stateless LLM gateway encoding the /teach methodology.",
+  "description": "Pocket Teach backend — NestJS teaching service.",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
-    "build": "tsc --noEmit",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "build": "nest build",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.21",
-    "@fastify/cors": "^11.0.0",
-    "@pocket-teach/api-types": "workspace:*",
-    "ai": "^7.0.37",
-    "dotenv": "^17.4.2",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-fastify": "^11.0.0",
     "fastify": "^5.2.0",
-    "pino": "^9.6.0",
-    "tsx": "^4.19.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
     "@types/node": "^22.10.0",
     "typescript": "^5.8.0"
   }

@@ -1,23 +1,22 @@
 import { z } from 'zod';
 
-const EnvSchema = z.object({
+export const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8787),
   GATEWAY_TOKEN: z.string().min(1).default('dev-token'),
   PROVIDER: z.string().min(1).default('claude'),
-  PLANNER_MODEL: z.string().min(1).default('claude-sonnet-5'),
-  WRITER_MODEL: z.string().min(1).default('claude-sonnet-5'),
+  MODEL: z.string().min(1).default('claude-sonnet-5'),
   ANTHROPIC_API_KEY: z.string().optional(),
 });
 
-export type Config = z.infer<typeof EnvSchema>;
+export type Env = z.infer<typeof EnvSchema>;
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = EnvSchema.safeParse(env);
+export function validateEnv(raw: Record<string, unknown>): Env {
+  const parsed = EnvSchema.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
       .join('\n');
-    throw new Error(`Invalid gateway environment:\n${issues}`);
+    throw new Error(`Invalid environment:\n${issues}`);
   }
   return parsed.data;
 }
