@@ -11,7 +11,7 @@ import {
   lucideX,
   lucideZap,
 } from '@ng-icons/lucide';
-import { GatewayService } from '../../api/gateway.service';
+import { ApiService } from '../../api/api.service';
 import { SettingsService } from '../../core/settings/settings.service';
 
 type TestState =
@@ -153,7 +153,7 @@ type TestState =
 })
 export class SettingsComponent {
   private readonly settings = inject(SettingsService);
-  private readonly gateway = inject(GatewayService);
+  private readonly api = inject(ApiService);
 
   protected baseUrl = '';
   protected bearerToken = '';
@@ -193,8 +193,8 @@ export class SettingsComponent {
     this.test.set({ kind: 'testing' });
     await this.persist();
     try {
-      const res = await this.gateway.health();
-      this.test.set({ kind: 'ok', message: `Connected — gateway reports "${res.status}".` });
+      const res = await this.api.health();
+      this.test.set({ kind: 'ok', message: `Connected — backend reports "${res.status}".` });
     } catch (err) {
       this.test.set({ kind: 'error', message: this.describe(err) });
     }

@@ -2,9 +2,15 @@ import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowLeft } from '@ng-icons/lucide';
+import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
-import type { Lesson, Project } from '../../data/models';
 import { TeacherChatComponent } from './teacher-chat.component';
+
+interface LessonRow {
+  slug: string;
+  seq: number;
+  title: string;
+}
 
 @Component({
   selector: 'app-project',
@@ -23,43 +29,15 @@ import { TeacherChatComponent } from './teacher-chat.component';
             <ng-icon name="lucideArrowLeft" size="18" />
           </a>
           <h1 class="text-lg font-bold tracking-tight truncate" style="color:var(--ink)">
-            {{ project()?.title ?? 'Project' }}
+            {{ title() }}
           </h1>
         </header>
 
-        @if (project(); as p) {
-          <div
-            class="flex flex-col gap-1.5 rounded-xl px-3.5 py-3 text-sm"
-            style="background:var(--chip);border:1px solid var(--line);color:var(--muted)"
-          >
-            <span
-              ><span class="font-semibold" style="color:var(--ink)">Mission · </span
-              >{{ p.mission.topic }}</span
-            >
-            @if (p.mission.why) {
-              <span
-                ><span class="font-semibold" style="color:var(--ink)">Why · </span
-                >{{ p.mission.why }}</span
-              >
-            }
-            @if (p.mission.successLooksLike) {
-              <span
-                ><span class="font-semibold" style="color:var(--ink)">Success · </span
-                >{{ p.mission.successLooksLike }}</span
-              >
-            }
-            @if (p.mission.constraints) {
-              <span
-                ><span class="font-semibold" style="color:var(--ink)">Constraints · </span
-                >{{ p.mission.constraints }}</span
-              >
-            }
-          </div>
-
+        @if (lessons().length > 0) {
           <section class="flex flex-col">
-            @for (lesson of lessons(); track lesson.id) {
+            @for (lesson of lessons(); track lesson.slug) {
               <a
-                [routerLink]="['/lesson', lesson.id]"
+                [routerLink]="['/lesson', id(), lesson.slug]"
                 class="flex items-center gap-3 py-3"
                 style="border-bottom:1px solid var(--line)"
               >
@@ -75,22 +53,23 @@ import { TeacherChatComponent } from './teacher-chat.component';
               </a>
             }
           </section>
+        }
 
-          <app-teacher-chat [project]="p" [lessons]="lessons()" (lessonCreated)="reload()" />
-        } @else if (loaded()) {
-          <p class="text-sm" style="color:var(--muted)">Project not found.</p>
+        @if (loaded()) {
+          <app-teacher-chat [projectId]="id()" (lessonCreated)="reload()" />
         }
       </div>
     </main>
   `,
 })
 export class ProjectComponent implements OnInit {
+  private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
 
   readonly id = input.required<string>();
 
-  protected readonly project = signal<Project | undefined>(undefined);
-  protected readonly lessons = signal<Lesson[]>([]);
+  protected readonly title = signal('New project');
+  protected readonly lessons = signal<LessonRow[]>([]);
   protected readonly loaded = signal(false);
 
   async ngOnInit(): Promise<void> {
@@ -99,12 +78,36 @@ export class ProjectComponent implements OnInit {
   }
 
   protected async reload(): Promise<void> {
-    const id = this.id();
-    this.project.set(await this.db.getProject(id));
-    this.lessons.set(await this.db.listLessons(id));
+    try {
+      const project = await this.api.getProject(this.id());
+      this.lessons.set(project.lessons);
+      this.title.set(titleFromMission(project.mission));
+      await this.db.cacheLessonSummaries(this.id(), project.lessons);
+    } catch {
+      // Offline: render the cached lesson index so lessons remain reachable.
+      const cached = await this.db.listCachedLessons(this.id());
+      if (cached.length > 0) this.lessons.set(cached);
+    }
   }
 
   protected pad(seq: number): string {
     return seq.toString().padStart(2, '0');
   }
+}
+
+function titleFromMission(mission: string): string {
+  // Strip leading list/heading markers so "- Topic: X", "## Topic", "Topic: X"
+  // all resolve to the topic value.
+  const cleaned = mission
+    .split('\n')
+    .map((l) => l.replace(/^[-*#>\s]+/, '').trim())
+    .filter((l) => l.length > 0);
+  for (const line of cleaned) {
+    const inline = /^topic:\s*(.+)$/i.exec(line);
+    if (inline) return inline[1].trim();
+  }
+  const idx = cleaned.findIndex((l) => /^topic$/i.test(l));
+  const afterHeading = idx !== -1 ? cleaned[idx + 1] : undefined;
+  if (afterHeading) return afterHeading;
+  return cleaned[0] ?? 'New project';
 }

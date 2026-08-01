@@ -11,6 +11,6 @@ services:
     ports:
       - '${PORT:-8787}:${PORT:-8787}'
     volumes:
-      # Persist the backup blob store across restarts.
+      # Persist the git-backed project workspaces across restarts (ADR 0001).
       - ./data:/app/apps/api/data
     restart: unless-stopped
