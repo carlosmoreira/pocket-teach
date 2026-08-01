@@ -16,9 +16,6 @@ async function bootstrap(): Promise<void> {
 
   const config = app.get(AppConfigService);
   const logger = new Logger('Bootstrap');
-  if (config.gatewayToken === 'dev-token') {
-    logger.warn('GATEWAY_TOKEN is the default "dev-token" — set a real token outside local dev.');
-  }
 
   await app.listen(config.port, '0.0.0.0');
   logger.log(`Backend listening on :${config.port} (provider=${config.provider})`);

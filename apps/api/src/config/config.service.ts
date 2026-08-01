@@ -10,10 +10,6 @@ export class AppConfigService {
     return this.config.get('PORT', { infer: true });
   }
 
-  get gatewayToken(): string {
-    return this.config.get('GATEWAY_TOKEN', { infer: true });
-  }
-
   get provider(): string {
     return this.config.get('PROVIDER', { infer: true });
   }

@@ -1,5 +1,5 @@
-import { Injectable, inject } from '@angular/core';
-import { SettingsService } from '../core/settings/settings.service';
+import { Injectable } from '@angular/core';
+import { environment } from '../../environments/environment';
 import type {
   ChatEvent,
   GenerationEvent,
@@ -8,8 +8,7 @@ import type {
   StoredMessage,
 } from './contracts';
 
-const NETWORK_MESSAGE =
-  'Could not reach the backend. Check the URL in Settings and that it is running.';
+const NETWORK_MESSAGE = 'Could not reach the backend. Check that it is running.';
 
 export interface LessonBody {
   slug: string;
@@ -21,16 +20,6 @@ export interface LessonBody {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private readonly settings = inject(SettingsService);
-
-  async health(): Promise<{ status: string }> {
-    const res = await fetch(this.url('/health'), { headers: this.authHeaders() }).catch(() => {
-      throw { status: 0 };
-    });
-    if (!res.ok) throw { status: res.status };
-    return res.json() as Promise<{ status: string }>;
-  }
-
   createProject(): Promise<{ id: string }> {
     return this.json('POST', '/projects');
   }
@@ -78,7 +67,7 @@ export class ApiService {
   }
 
   private async json<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { ...this.authRecord() };
+    const headers: Record<string, string> = {};
     // Only advertise a JSON body when there is one — Fastify 400s on an empty
     // body sent with Content-Type: application/json.
     let payload: string | undefined;
@@ -88,7 +77,7 @@ export class ApiService {
     }
     let res: Response;
     try {
-      res = await fetch(this.url(path), { method, headers, body: payload });
+      res = await fetch(url(path), { method, headers, body: payload });
     } catch {
       throw new Error(NETWORK_MESSAGE);
     }
@@ -105,9 +94,9 @@ export class ApiService {
   ): AsyncGenerator<T> {
     let response: Response;
     try {
-      response = await fetch(this.url(path), {
+      response = await fetch(url(path), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...this.authRecord() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal,
       });
@@ -143,21 +132,10 @@ export class ApiService {
       yield errorFor(NETWORK_MESSAGE);
     }
   }
+}
 
-  private url(path: string): string {
-    const base = this.settings.baseUrl();
-    if (!base) throw new Error('Backend URL is not configured.');
-    return `${base}${path}`;
-  }
-
-  private authHeaders(): Record<string, string> {
-    return this.authRecord();
-  }
-
-  private authRecord(): Record<string, string> {
-    const token = this.settings.bearerToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
+function url(path: string): string {
+  return `${environment.apiBaseUrl}${path}`;
 }
 
 function frameData(frame: string): unknown {
@@ -199,9 +177,6 @@ function genError(message: string): GenerationEvent {
 }
 
 async function httpErrorMessage(response: Response): Promise<string> {
-  if (response.status === 401 || response.status === 403) {
-    return 'The backend rejected the token (unauthorized).';
-  }
   if (response.status === 404) return 'Not found.';
   let detail = '';
   try {

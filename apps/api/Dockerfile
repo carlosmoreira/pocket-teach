@@ -25,9 +25,9 @@ RUN apk add --no-cache curl git \
 COPY --from=build --chown=app:app /app /app
 WORKDIR /app/apps/api
 USER app
-EXPOSE 8787
+EXPOSE 1212
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT:-8787}/health" || exit 1
+  CMD curl -fsS "http://127.0.0.1:${PORT:-1212}/health" || exit 1
 
 CMD ["node", "dist/main.js"]

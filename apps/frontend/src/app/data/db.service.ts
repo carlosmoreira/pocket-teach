@@ -1,16 +1,14 @@
 import { Injectable } from '@angular/core';
 import Dexie, { type Table } from 'dexie';
-import { type CachedLesson, type CachedProject, type Settings, SETTINGS_KEY } from './models';
+import type { CachedLesson, CachedProject } from './models';
 import type { LessonSummary } from '../api/contracts';
 
-// A new database name so the old client-owned workspace (projects, messages,
-// records) is dropped — the backend is the source of truth now. This store is
-// an offline replica: the project index and lessons, plus settings.
+// The backend is the source of truth; this store is an offline replica of the
+// project index and lessons so lessons read without the backend.
 @Injectable({ providedIn: 'root' })
 export class DbService extends Dexie {
   readonly projects!: Table<CachedProject, string>;
   readonly lessons!: Table<CachedLesson, string>;
-  readonly settings!: Table<Settings, string>;
 
   constructor() {
     super('pocket-teach-v2');
@@ -20,14 +18,13 @@ export class DbService extends Dexie {
       lessons: 'key, projectId',
       settings: 'id',
     });
-  }
-
-  async loadSettings(): Promise<Settings | undefined> {
-    return this.settings.get(SETTINGS_KEY);
-  }
-
-  async saveSettings(settings: Omit<Settings, 'id'>): Promise<void> {
-    await this.settings.put({ ...settings, id: SETTINGS_KEY });
+    // Backend URL is a build-time env var now and there's no token — drop the
+    // settings store.
+    this.version(3).stores({
+      projects: 'id, updatedAt',
+      lessons: 'key, projectId',
+      settings: null,
+    });
   }
 
   async cacheProjects(projects: CachedProject[]): Promise<void> {

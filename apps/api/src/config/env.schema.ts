@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
 export const EnvSchema = z.object({
-  PORT: z.coerce.number().int().positive().default(8787),
-  GATEWAY_TOKEN: z.string().min(1).default('dev-token'),
+  PORT: z.coerce.number().int().positive().default(1212),
   PROVIDER: z.string().min(1).default('claude'),
   MODEL: z.string().min(1).default('claude-sonnet-5'),
   ANTHROPIC_API_KEY: z.string().optional(),

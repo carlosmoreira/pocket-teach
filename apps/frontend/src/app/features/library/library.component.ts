@@ -1,12 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import {
-  lucideGraduationCap,
-  lucidePlus,
-  lucideSettings,
-  lucideTriangleAlert,
-} from '@ng-icons/lucide';
+import { lucideGraduationCap, lucidePlus, lucideTriangleAlert } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
 import type { CachedProject } from '../../data/models';
@@ -14,9 +9,7 @@ import type { CachedProject } from '../../data/models';
 @Component({
   selector: 'app-library',
   imports: [RouterLink, NgIcon],
-  viewProviders: [
-    provideIcons({ lucideSettings, lucidePlus, lucideGraduationCap, lucideTriangleAlert }),
-  ],
+  viewProviders: [provideIcons({ lucidePlus, lucideGraduationCap, lucideTriangleAlert })],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
       <div class="w-full max-w-lg flex flex-col gap-5 pb-24">
@@ -24,27 +17,18 @@ import type { CachedProject } from '../../data/models';
           <h1 class="text-lg font-bold tracking-tight flex-1" style="color:var(--ink)">
             Pocket Teach
           </h1>
-          <a
-            routerLink="/settings"
-            class="grid place-items-center w-9 h-9 rounded-xl"
-            style="background:var(--panel);border:1px solid var(--line);color:var(--ink)"
-            aria-label="Settings"
-          >
-            <ng-icon name="lucideSettings" size="18" />
-          </a>
         </header>
 
         @if (!loaded()) {
           <p class="text-sm" style="color:var(--muted)">Loading…</p>
         } @else if (error()) {
-          <a
-            routerLink="/settings"
+          <p
             class="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm"
             style="background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)"
           >
             <ng-icon name="lucideTriangleAlert" size="16" />
             {{ error() }}
-          </a>
+          </p>
         } @else if (projects().length === 0) {
           <section
             class="rounded-2xl p-8 flex flex-col items-center text-center gap-3"
