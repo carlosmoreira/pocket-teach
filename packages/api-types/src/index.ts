@@ -44,10 +44,18 @@ export interface Proposal {
   confirmed?: boolean;
 }
 
+export interface CreatedLessonRef {
+  slug: string;
+  title: string;
+}
+
 export interface StoredMessage {
   role: 'user' | 'assistant';
   content: string;
   proposal?: Proposal;
+  // Set on the assistant turn that announces a finished lesson, so the "lesson
+  // ready" card survives a reload.
+  lesson?: CreatedLessonRef;
   at: string;
 }
 

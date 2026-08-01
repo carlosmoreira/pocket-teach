@@ -289,6 +289,8 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
           // Proposals are live offers, actionable only during the turn that
           // produced them. On reload we never re-arm a card (the lesson list is
           // the truth for what exists) — the offer text remains; ask again to act.
+          // Lesson-ready cards, though, are persisted and re-shown.
+          lesson: m.lesson,
         })),
       );
       if (transcript.length === 0) await this.runChat(undefined);

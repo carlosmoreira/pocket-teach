@@ -153,6 +153,16 @@ export class GenerationService {
       emit({ type: 'error', message });
       return;
     }
+
+    // Persist the "lesson ready" announcement so the confirmation survives a
+    // reload (the client also shows it live).
+    await this.workspace.appendTranscript(projectId, {
+      role: 'assistant',
+      content: 'Done — your new lesson is ready.',
+      lesson: { slug: written.slug, title: written.title },
+      at: new Date().toISOString(),
+    });
+
     emit({ type: 'phase', phase: 'done' });
     emit({ type: 'done' });
   }
