@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideArrowLeft, lucideBookOpen, lucideChevronDown } from '@ng-icons/lucide';
+import { lucideArrowLeft, lucideBookOpen, lucideChevronDown, lucideTrash2 } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
 import { TeacherChatComponent } from './teacher-chat.component';
@@ -15,7 +15,9 @@ interface LessonRow {
 @Component({
   selector: 'app-project',
   imports: [RouterLink, NgIcon, TeacherChatComponent],
-  viewProviders: [provideIcons({ lucideArrowLeft, lucideBookOpen, lucideChevronDown })],
+  viewProviders: [
+    provideIcons({ lucideArrowLeft, lucideBookOpen, lucideChevronDown, lucideTrash2 }),
+  ],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
       <div class="w-full max-w-lg lg:max-w-5xl flex flex-col gap-5">
@@ -28,10 +30,29 @@ interface LessonRow {
           >
             <ng-icon name="lucideArrowLeft" size="18" />
           </a>
-          <h1 class="text-lg font-bold tracking-tight truncate" style="color:var(--ink)">
+          <h1 class="text-lg font-bold tracking-tight truncate flex-1" style="color:var(--ink)">
             {{ title() }}
           </h1>
+          <button
+            type="button"
+            (click)="remove()"
+            [disabled]="deleting()"
+            class="grid place-items-center w-9 h-9 rounded-xl shrink-0 disabled:opacity-40"
+            style="background:var(--panel);border:1px solid var(--line);color:var(--muted)"
+            aria-label="Delete project"
+          >
+            <ng-icon name="lucideTrash2" size="18" />
+          </button>
         </header>
+
+        @if (deleteError(); as msg) {
+          <p
+            class="rounded-xl px-3.5 py-2.5 text-sm"
+            style="background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)"
+          >
+            {{ msg }}
+          </p>
+        }
 
         <div class="flex flex-col gap-5 lg:flex-row lg:gap-6 lg:items-start">
           @if (lessons().length > 0) {
@@ -133,6 +154,7 @@ interface LessonRow {
 export class ProjectComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
+  private readonly router = inject(Router);
 
   readonly id = input.required<string>();
 
@@ -140,6 +162,8 @@ export class ProjectComponent implements OnInit {
   protected readonly lessons = signal<LessonRow[]>([]);
   protected readonly loaded = signal(false);
   protected readonly expanded = signal(false);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     await this.reload();
@@ -156,6 +180,20 @@ export class ProjectComponent implements OnInit {
       // Offline: render the cached lesson index so lessons remain reachable.
       const cached = await this.db.listCachedLessons(this.id());
       if (cached.length > 0) this.lessons.set(cached);
+    }
+  }
+
+  protected async remove(): Promise<void> {
+    if (this.deleting()) return;
+    if (!confirm(`Delete "${this.title()}" and all its lessons? This can't be undone.`)) return;
+    this.deleting.set(true);
+    try {
+      await this.api.deleteProject(this.id());
+      await this.db.removeCachedProject(this.id());
+      await this.router.navigate(['/library']);
+    } catch (err) {
+      this.deleteError.set(err instanceof Error ? err.message : 'Could not delete the project.');
+      this.deleting.set(false);
     }
   }
 

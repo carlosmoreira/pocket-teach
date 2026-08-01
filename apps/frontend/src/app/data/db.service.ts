@@ -79,4 +79,11 @@ export class DbService extends Dexie {
   async getCachedLesson(projectId: string, slug: string): Promise<CachedLesson | undefined> {
     return this.lessons.get(`${projectId}/${slug}`);
   }
+
+  async removeCachedProject(id: string): Promise<void> {
+    await this.transaction('rw', this.projects, this.lessons, async () => {
+      await this.projects.delete(id);
+      await this.lessons.where('projectId').equals(id).delete();
+    });
+  }
 }

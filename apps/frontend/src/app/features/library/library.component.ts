@@ -1,7 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideGraduationCap, lucidePlus, lucideTriangleAlert } from '@ng-icons/lucide';
+import {
+  lucideGraduationCap,
+  lucidePlus,
+  lucideTrash2,
+  lucideTriangleAlert,
+} from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
 import type { CachedProject } from '../../data/models';
@@ -9,7 +14,9 @@ import type { CachedProject } from '../../data/models';
 @Component({
   selector: 'app-library',
   imports: [RouterLink, NgIcon],
-  viewProviders: [provideIcons({ lucidePlus, lucideGraduationCap, lucideTriangleAlert })],
+  viewProviders: [
+    provideIcons({ lucidePlus, lucideGraduationCap, lucideTriangleAlert, lucideTrash2 }),
+  ],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
       <div class="w-full max-w-lg flex flex-col gap-5 pb-24">
@@ -57,18 +64,34 @@ import type { CachedProject } from '../../data/models';
         } @else {
           <section class="flex flex-col gap-3">
             @for (project of projects(); track project.id) {
-              <a
-                [routerLink]="['/project', project.id]"
-                class="rounded-2xl p-4 flex flex-col gap-1"
+              <div
+                class="rounded-2xl p-4 flex items-center gap-2"
                 style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
               >
-                <h3 class="text-sm font-bold" style="color:var(--ink)">{{ project.title }}</h3>
-                <span class="mt-1 text-xs font-semibold" style="color:var(--accent-2)">
-                  {{ project.lessonCount }}
-                  {{ project.lessonCount === 1 ? 'lesson' : 'lessons' }} ·
-                  {{ updatedLabel(project.updatedAt) }}
-                </span>
-              </a>
+                <a
+                  [routerLink]="['/project', project.id]"
+                  class="flex-1 flex flex-col gap-1 min-w-0"
+                >
+                  <h3 class="text-sm font-bold truncate" style="color:var(--ink)">
+                    {{ project.title }}
+                  </h3>
+                  <span class="mt-1 text-xs font-semibold" style="color:var(--accent-2)">
+                    {{ project.lessonCount }}
+                    {{ project.lessonCount === 1 ? 'lesson' : 'lessons' }} ·
+                    {{ updatedLabel(project.updatedAt) }}
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  (click)="remove(project)"
+                  [disabled]="deleting() === project.id"
+                  class="grid place-items-center w-9 h-9 rounded-xl shrink-0 disabled:opacity-40"
+                  style="color:var(--muted)"
+                  aria-label="Delete project"
+                >
+                  <ng-icon name="lucideTrash2" size="18" />
+                </button>
+              </div>
             }
           </section>
         }
@@ -97,6 +120,7 @@ export class LibraryComponent implements OnInit {
   protected readonly projects = signal<CachedProject[]>([]);
   protected readonly loaded = signal(false);
   protected readonly creating = signal(false);
+  protected readonly deleting = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
@@ -124,6 +148,21 @@ export class LibraryComponent implements OnInit {
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Could not create a project.');
       this.creating.set(false);
+    }
+  }
+
+  protected async remove(project: CachedProject): Promise<void> {
+    if (this.deleting()) return;
+    if (!confirm(`Delete "${project.title}" and all its lessons? This can't be undone.`)) return;
+    this.deleting.set(project.id);
+    try {
+      await this.api.deleteProject(project.id);
+      await this.db.removeCachedProject(project.id);
+      this.projects.update((list) => list.filter((p) => p.id !== project.id));
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not delete the project.');
+    } finally {
+      this.deleting.set(null);
     }
   }
 

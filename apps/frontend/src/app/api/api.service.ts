@@ -32,6 +32,11 @@ export class ApiService {
     return this.json('GET', `/projects/${id}`);
   }
 
+  // Removes the project and all its lessons (the whole server-side workspace).
+  deleteProject(id: string): Promise<{ ok: true }> {
+    return this.json('DELETE', `/projects/${id}`);
+  }
+
   getLesson(projectId: string, slug: string): Promise<LessonBody> {
     return this.json('GET', `/projects/${projectId}/lessons/${slug}`);
   }
