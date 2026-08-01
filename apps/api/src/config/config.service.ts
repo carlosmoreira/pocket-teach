@@ -25,4 +25,8 @@ export class AppConfigService {
   get anthropicApiKey(): string | undefined {
     return this.config.get('ANTHROPIC_API_KEY', { infer: true });
   }
+
+  get workspaceRoot(): string {
+    return this.config.get('WORKSPACE_ROOT', { infer: true });
+  }
 }

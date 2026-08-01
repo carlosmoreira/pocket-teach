@@ -6,6 +6,8 @@ export const EnvSchema = z.object({
   PROVIDER: z.string().min(1).default('claude'),
   MODEL: z.string().min(1).default('claude-sonnet-5'),
   ANTHROPIC_API_KEY: z.string().optional(),
+  // Root directory holding one git-backed workspace per project (ADR 0001).
+  WORKSPACE_ROOT: z.string().min(1).default('./data/workspaces'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -5,9 +5,10 @@ import { AuthGuard } from './auth/auth.guard';
 import { HealthModule } from './health/health.module';
 import { ProvidersModule } from './providers/providers.module';
 import { SearchModule } from './search/search.module';
+import { WorkspaceModule } from './workspace/workspace.module';
 
 @Module({
-  imports: [AppConfigModule, ProvidersModule, SearchModule, HealthModule],
+  imports: [AppConfigModule, ProvidersModule, SearchModule, WorkspaceModule, HealthModule],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}
