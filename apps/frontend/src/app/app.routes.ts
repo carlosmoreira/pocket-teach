@@ -7,17 +7,12 @@ export const routes: Routes = [
       import('./features/library/library.component').then((m) => m.LibraryComponent),
   },
   {
-    path: 'new',
-    loadComponent: () =>
-      import('./features/new-project/new-project.component').then((m) => m.NewProjectComponent),
-  },
-  {
     path: 'project/:id',
     loadComponent: () =>
       import('./features/project/project.component').then((m) => m.ProjectComponent),
   },
   {
-    path: 'lesson/:id',
+    path: 'lesson/:projectId/:slug',
     loadComponent: () =>
       import('./features/lesson/lesson.component').then((m) => m.LessonComponent),
   },

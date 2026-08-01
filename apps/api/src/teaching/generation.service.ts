@@ -13,8 +13,10 @@ import {
 } from './prompts';
 import type { EmitGeneration } from './generation.events';
 
-const MAX_STEPS = 12;
-const MAX_OUTPUT_TOKENS = 16000;
+const MAX_STEPS = 16;
+// Generous so a long research pass plus the full lesson HTML (passed as the
+// write_lesson tool argument) never truncates mid-call and fails validation.
+const MAX_OUTPUT_TOKENS = 32000;
 
 // Schemas at module scope with explicit execute-input types: the AI SDK's tool()
 // generics are too deep for tsc to infer through (TS2589), so we annotate.

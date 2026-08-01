@@ -186,21 +186,19 @@ function ensureTrailingNewline(content: string): string {
 }
 
 function titleFromMission(mission: string): string {
-  const lines = mission.split('\n').map((l) => l.trim());
-  // "Topic: X"
-  for (const line of lines) {
+  // Strip leading list/heading/quote markers so "- Topic: X", "## Topic",
+  // "Topic: X" all resolve to the topic value.
+  const cleaned = mission
+    .split('\n')
+    .map((l) => l.replace(/^[-*#>\s]+/, '').trim())
+    .filter((l) => l.length > 0);
+  for (const line of cleaned) {
     const inline = /^topic:\s*(.+)$/i.exec(line);
     if (inline) return inline[1].trim();
   }
-  // A "## Topic" heading followed by its value on the next content line.
-  const topicHeading = lines.findIndex((l) => /^#+\s*topic\b/i.test(l));
-  if (topicHeading !== -1) {
-    const value = lines.slice(topicHeading + 1).find((l) => l.length > 0 && !l.startsWith('#'));
-    if (value) return value;
-  }
-  // Otherwise the first non-heading, non-empty line.
-  const first = lines.find((l) => l.length > 0 && !l.startsWith('#'));
-  return first || 'Untitled project';
+  const topicHeading = cleaned.findIndex((l) => /^topic$/i.test(l));
+  if (topicHeading !== -1 && cleaned[topicHeading + 1]) return cleaned[topicHeading + 1];
+  return cleaned[0] ?? 'Untitled project';
 }
 
 function pad4(n: number): string {

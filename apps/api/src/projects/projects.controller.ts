@@ -38,7 +38,16 @@ export class ProjectsController {
     await this.require(id);
     const html = await this.workspace.readLesson(id, slug);
     if (html === undefined) throw new NotFoundException('lesson not found');
-    return { slug, html };
+    const summary = (await this.workspace.listLessons(id)).find(
+      (l) => l.slug === slug || l.slug.replace(/^\d+-/, '') === slug,
+    );
+    return {
+      slug: summary?.slug ?? slug,
+      title: summary?.title ?? 'Lesson',
+      seq: summary?.seq ?? 0,
+      recap: summary?.recap ?? '',
+      html,
+    };
   }
 
   @Get(':id/transcript')

@@ -1,6 +1,7 @@
 import {
   Component,
   ElementRef,
+  OnDestroy,
   OnInit,
   computed,
   effect,
@@ -19,18 +20,20 @@ import {
   lucideTriangleAlert,
   lucideWandSparkles,
 } from '@ng-icons/lucide';
-import type { ChatMessage, Phase, Proposal } from '@pocket-teach/api-types';
+import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
-import { buildContextMarkdown } from '../../data/workspace-context';
-import type { LearningRecord, Lesson, Message, Project } from '../../data/models';
-import { GatewayService } from '../../api/gateway.service';
+import type { GenerationPhase, Proposal } from '../../api/contracts';
 
-const MAX_CHAT_STEPS = 6;
+interface ChatMsg {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  proposal?: Proposal;
+}
 
 const PHASE_LABELS: Record<string, string> = {
   planning: 'reading your workspace…',
   researching: 'grounding in trusted sources…',
-  plan: 'plan ready…',
   writing: 'writing the lesson…',
   done: 'saving…',
   error: '',
@@ -60,7 +63,7 @@ const PHASE_LABELS: Record<string, string> = {
             [class.self-start]="message.role === 'assistant'"
             [style]="message.role === 'user' ? userBubble : teacherBubble"
           >
-            {{ display(message.content) }}
+            {{ message.content }}
           </div>
 
           @if (message.proposal; as proposal) {
@@ -73,7 +76,8 @@ const PHASE_LABELS: Record<string, string> = {
                   class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
                   style="color:var(--accent)"
                 >
-                  <ng-icon name="lucideWandSparkles" size="14" /> New lesson
+                  <ng-icon name="lucideWandSparkles" size="14" />
+                  {{ proposal.kind === 'amplify' ? 'Clarify lesson' : 'New lesson' }}
                 </span>
                 <span class="text-sm font-semibold" style="color:var(--ink)">{{
                   proposal.objective
@@ -118,12 +122,6 @@ const PHASE_LABELS: Record<string, string> = {
           >
             Thinking…
           </div>
-        }
-
-        @if (messages().length === 0 && !sending()) {
-          <p class="text-sm" style="color:var(--muted)">
-            Ask the teacher anything about this course, or say what you'd like to learn next.
-          </p>
         }
       </div>
 
@@ -176,11 +174,6 @@ const PHASE_LABELS: Record<string, string> = {
               </span>
             </div>
           }
-        } @else if (hasPendingProposal()) {
-          <p class="text-xs" style="color:var(--muted)">
-            A lesson is ready to build — tap
-            <span style="color:var(--accent);font-weight:600">Create lesson</span> above.
-          </p>
         }
 
         <div
@@ -198,7 +191,7 @@ const PHASE_LABELS: Record<string, string> = {
           <button
             type="button"
             (click)="send()"
-            [disabled]="sending() || !draft().trim()"
+            [disabled]="sending() || generatingFor() !== null || !draft().trim()"
             class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0 disabled:opacity-40"
             style="background:var(--accent)"
             aria-label="Send"
@@ -210,29 +203,26 @@ const PHASE_LABELS: Record<string, string> = {
     </section>
   `,
 })
-export class TeacherChatComponent implements OnInit {
+export class TeacherChatComponent implements OnInit, OnDestroy {
+  private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
-  private readonly gateway = inject(GatewayService);
+  private readonly abort = new AbortController();
 
-  readonly project = input.required<Project>();
-  readonly lessons = input.required<Lesson[]>();
+  readonly projectId = input.required<string>();
   readonly lessonCreated = output<void>();
 
-  protected readonly messages = signal<Message[]>([]);
+  protected readonly messages = signal<ChatMsg[]>([]);
   protected readonly draft = signal('');
   protected readonly streaming = signal('');
   protected readonly sending = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly hasPendingProposal = computed(() => this.messages().some((m) => !!m.proposal));
-
   protected readonly generatingFor = signal<string | null>(null);
   protected readonly generatingObjective = computed(() => {
     const id = this.generatingFor();
-    if (!id) return null;
-    return this.messages().find((m) => m.id === id)?.proposal?.objective ?? null;
+    return id ? (this.messages().find((m) => m.id === id)?.proposal?.objective ?? null) : null;
   });
-  protected readonly genPhase = signal<Phase | null>(null);
+  protected readonly genPhase = signal<GenerationPhase | null>(null);
   protected readonly genError = signal<string | null>(null);
 
   protected readonly userBubble = 'background:var(--accent);color:#fff';
@@ -240,8 +230,7 @@ export class TeacherChatComponent implements OnInit {
     'background:var(--panel);border:1px solid var(--line);color:var(--ink)';
 
   private readonly scrollBox = viewChild<ElementRef<HTMLDivElement>>('scrollBox');
-  private records: LearningRecord[] = [];
-  private genRequestId = '';
+  private genRequestObjective = '';
 
   constructor() {
     effect(() => {
@@ -255,23 +244,31 @@ export class TeacherChatComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    const projectId = this.project().id;
-    this.messages.set(await this.db.listMessages(projectId));
-    this.records = await this.db.listLearningRecords(projectId);
+    try {
+      const transcript = await this.api.getTranscript(this.projectId());
+      const lastIdx = transcript.length - 1;
+      this.messages.set(
+        transcript.map((m, i) => ({
+          id: crypto.randomUUID(),
+          role: m.role,
+          content: m.content,
+          // Only the latest, still-open offer stays actionable; older or already
+          // confirmed proposals are stale (their lesson exists) — don't re-arm.
+          proposal: i === lastIdx && m.proposal && !m.proposal.confirmed ? m.proposal : undefined,
+        })),
+      );
+      if (transcript.length === 0) await this.runChat(undefined);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not reach the backend.');
+    }
   }
 
-  protected display(content: string): string {
-    return visibleText(content);
+  ngOnDestroy(): void {
+    this.abort.abort();
   }
 
   protected genPhaseLabel(): string {
     return PHASE_LABELS[this.genPhase() ?? 'planning'] ?? 'starting…';
-  }
-
-  protected async retryGeneration(): Promise<void> {
-    const id = this.generatingFor();
-    const message = id ? this.messages().find((m) => m.id === id) : undefined;
-    if (message) await this.createLesson(message);
   }
 
   protected onEnter(event: Event): void {
@@ -283,24 +280,33 @@ export class TeacherChatComponent implements OnInit {
 
   protected async send(): Promise<void> {
     const text = this.draft().trim();
-    if (!text || this.sending()) return;
-
+    if (!text || this.sending() || this.generatingFor() !== null) return;
     this.draft.set('');
-    this.error.set(null);
-    await this.appendMessage('user', text);
+    this.appendMessage('user', text);
+    await this.runChat(text);
+  }
 
+  private async runChat(message: string | undefined): Promise<void> {
+    this.error.set(null);
     this.sending.set(true);
     this.streaming.set('');
     try {
-      const { text: answer, proposal } = await this.runChat();
-      if (proposal) await this.clearPendingProposals();
-      if (answer || proposal) {
-        const message = await this.appendMessage(
-          'assistant',
-          answer || fallbackText(proposal),
-          proposal,
-        );
-        if (proposal?.confirmed) void this.createLesson(message);
+      let answer = '';
+      let proposal: Proposal | undefined;
+      for await (const event of this.api.chat(this.projectId(), message, this.abort.signal)) {
+        if (event.type === 'message') {
+          answer += event.delta;
+          this.streaming.set(answer);
+        } else if (event.type === 'proposal') {
+          proposal = event.proposal;
+        } else if (event.type === 'error') {
+          this.error.set(event.message);
+        }
+      }
+      if (this.abort.signal.aborted) return;
+      if (answer.trim() || proposal) {
+        const msg = this.appendMessage('assistant', answer.trim(), proposal);
+        if (proposal?.confirmed) void this.createLesson(msg);
       }
     } finally {
       this.streaming.set('');
@@ -308,35 +314,35 @@ export class TeacherChatComponent implements OnInit {
     }
   }
 
-  private async clearPendingProposals(): Promise<void> {
-    for (const message of this.messages()) {
-      if (message.proposal) await this.clearProposal(message);
-    }
-  }
-
-  protected async createLesson(message: Message): Promise<void> {
-    this.genRequestId = crypto.randomUUID();
+  protected async createLesson(message: ChatMsg): Promise<void> {
+    if (!message.proposal) return;
+    this.genRequestObjective = message.proposal.objective;
     this.generatingFor.set(message.id);
     await this.runLessonGeneration(message);
   }
 
-  protected async runLessonGeneration(message: Message): Promise<void> {
+  protected async runLessonGeneration(message: ChatMsg): Promise<void> {
     this.genPhase.set(null);
     this.genError.set(null);
+    const proposal = message.proposal;
+    if (!proposal) return;
 
-    const context = buildContextMarkdown(this.project(), this.lessons(), this.records, {
-      requested: message.proposal,
-    });
-    for await (const event of this.gateway.generateLesson(context, this.genRequestId)) {
+    for await (const event of this.api.generateLesson(
+      this.projectId(),
+      { objective: this.genRequestObjective, focus: proposal.focus },
+      this.abort.signal,
+    )) {
       switch (event.type) {
         case 'phase':
           this.genPhase.set(event.phase);
           break;
-        case 'done':
-          await this.db.saveGeneratedLesson(this.project().id, event);
-          await this.clearProposal(message);
-          this.generatingFor.set(null);
+        case 'lesson':
+          await this.cacheLesson(event.lesson.slug);
           this.lessonCreated.emit();
+          break;
+        case 'done':
+          this.clearProposal(message);
+          this.generatingFor.set(null);
           return;
         case 'error':
           this.genError.set(event.message);
@@ -345,99 +351,44 @@ export class TeacherChatComponent implements OnInit {
     }
   }
 
-  protected async dismissProposal(message: Message): Promise<void> {
-    await this.clearProposal(message);
+  protected retryGeneration(): void {
+    const id = this.generatingFor();
+    const message = id ? this.messages().find((m) => m.id === id) : undefined;
+    if (message) void this.runLessonGeneration(message);
   }
 
-  private async clearProposal(message: Message): Promise<void> {
-    await this.db.updateMessage(message.id, { proposal: undefined });
+  protected dismissProposal(message: ChatMsg): void {
+    this.clearProposal(message);
+  }
+
+  private clearProposal(message: ChatMsg): void {
     this.messages.update((list) =>
       list.map((m) => (m.id === message.id ? { ...m, proposal: undefined } : m)),
     );
   }
 
-  private async runChat(): Promise<{ text: string; proposal?: Proposal }> {
-    const context = buildContextMarkdown(this.project(), this.lessons(), this.records);
-    const history: ChatMessage[] = this.messages().map((m) => {
-      const clean = visibleText(m.content);
-      const pending = m.proposal
-        ? `${clean}\n\n[You have an unconfirmed offer on the table — objective: "${m.proposal.objective}". If the learner agrees, confirm it.]`
-        : clean;
-      return { type: 'text', role: m.role, content: pending };
-    });
-
-    let display = '';
-    let proposal: Proposal | undefined;
-    for (let step = 0; step < MAX_CHAT_STEPS; step++) {
-      let segment = '';
-      let toolSlug: string | undefined;
-      let errored = false;
-
-      for await (const event of this.gateway.chat({ contextMarkdown: context, history })) {
-        if (event.type === 'message') {
-          segment += event.delta;
-          display += event.delta;
-          this.streaming.set(visibleText(display));
-        } else if (event.type === 'tool_call') {
-          toolSlug = event.call.slug;
-        } else if (event.type === 'proposal') {
-          if (event.proposal.kind === 'new_lesson') proposal = event.proposal;
-        } else if (event.type === 'error') {
-          this.error.set(event.message);
-          errored = true;
-        }
-      }
-
-      if (errored || toolSlug === undefined) break;
-
-      if (segment) history.push({ type: 'text', role: 'assistant', content: segment });
-      history.push({ type: 'tool_call', call: { tool: 'read_lesson', slug: toolSlug } });
-      const lesson = await this.db.getLessonBySlug(this.project().id, toolSlug);
-      history.push({
-        type: 'tool_result',
-        result: { tool: 'read_lesson', slug: toolSlug, html: lesson?.html ?? '' },
+  private async cacheLesson(slug: string): Promise<void> {
+    try {
+      const { html } = await this.api.getLesson(this.projectId(), slug);
+      const project = await this.api.getProject(this.projectId());
+      const summary = project.lessons.find((l) => l.slug === slug);
+      if (!summary) return;
+      await this.db.cacheLesson({
+        projectId: this.projectId(),
+        slug: summary.slug,
+        seq: summary.seq,
+        title: summary.title,
+        recap: summary.recap,
+        html,
       });
+    } catch {
+      /* caching is best-effort; the lesson still reads online */
     }
-
-    return { text: visibleText(display), proposal };
   }
 
-  private async appendMessage(
-    role: 'user' | 'assistant',
-    content: string,
-    proposal?: Proposal,
-  ): Promise<Message> {
-    const message: Message = {
-      id: crypto.randomUUID(),
-      projectId: this.project().id,
-      role,
-      content,
-      proposal,
-      createdAt: new Date().toISOString(),
-    };
-    await this.db.addMessage(message);
+  private appendMessage(role: 'user' | 'assistant', content: string, proposal?: Proposal): ChatMsg {
+    const message: ChatMsg = { id: crypto.randomUUID(), role, content, proposal };
     this.messages.update((list) => [...list, message]);
     return message;
   }
-}
-
-const ISLAND = `<script[^>]*\\bid=["'](?:proposal|record)["'][\\s\\S]*?<\\/script>`;
-const FENCED_ISLAND_RE = new RegExp('```[a-z]*\\s*' + ISLAND + '\\s*```', 'gi');
-const ISLAND_RE = new RegExp(ISLAND, 'gi');
-const EMPTY_FENCE_RE = /```[a-z]*\s*```/gi;
-const PARTIAL_ISLAND_RE = /(?:```[a-z]*\s*)?<script\b(?:(?!<\/script>)[\s\S])*$/i;
-
-function visibleText(raw: string): string {
-  return raw
-    .replace(FENCED_ISLAND_RE, '')
-    .replace(ISLAND_RE, '')
-    .replace(EMPTY_FENCE_RE, '')
-    .replace(PARTIAL_ISLAND_RE, '')
-    .trim();
-}
-
-function fallbackText(proposal?: Proposal): string {
-  if (proposal?.confirmed) return 'Putting that lesson together now…';
-  if (proposal) return "Here's a lesson I'd suggest:";
-  return 'Ready for the next lesson whenever you are.';
 }

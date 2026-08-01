@@ -1,44 +1,23 @@
 import { Injectable } from '@angular/core';
-import type { DoneEvent, GlossaryEntry, ResourceEntry } from '@pocket-teach/api-types';
 import Dexie, { type Table } from 'dexie';
-import {
-  type LearningRecord,
-  type Lesson,
-  type Message,
-  type Project,
-  type ProjectMission,
-  type ReferenceDocRow,
-  type Settings,
-  SETTINGS_KEY,
-} from './models';
+import { type CachedLesson, type CachedProject, type Settings, SETTINGS_KEY } from './models';
+import type { LessonSummary } from '../api/contracts';
 
-export interface ProjectSummary {
-  project: Project;
-  lessonCount: number;
-}
-
-export interface SavedGeneration {
-  projectId: string;
-  lessonId: string;
-}
-
+// A new database name so the old client-owned workspace (projects, messages,
+// records) is dropped — the backend is the source of truth now. This store is
+// an offline replica: the project index and lessons, plus settings.
 @Injectable({ providedIn: 'root' })
 export class DbService extends Dexie {
-  readonly projects!: Table<Project, string>;
-  readonly lessons!: Table<Lesson, string>;
-  readonly learningRecords!: Table<LearningRecord, string>;
-  readonly referenceDocs!: Table<ReferenceDocRow, string>;
-  readonly messages!: Table<Message, string>;
+  readonly projects!: Table<CachedProject, string>;
+  readonly lessons!: Table<CachedLesson, string>;
   readonly settings!: Table<Settings, string>;
 
   constructor() {
-    super('pocket-teach');
-    this.version(1).stores({
-      projects: 'id, createdAt',
-      lessons: 'id, projectId, [projectId+seq], slug',
-      learningRecords: 'id, projectId, [projectId+seq], status',
-      referenceDocs: 'id, projectId, [projectId+slug]',
-      messages: 'id, projectId, [projectId+createdAt]',
+    super('pocket-teach-v2');
+    this.version(1).stores({ lessons: 'key, projectId', settings: 'id' });
+    this.version(2).stores({
+      projects: 'id, updatedAt',
+      lessons: 'key, projectId',
       settings: 'id',
     });
   }
@@ -51,132 +30,56 @@ export class DbService extends Dexie {
     await this.settings.put({ ...settings, id: SETTINGS_KEY });
   }
 
-  async listProjectSummaries(): Promise<ProjectSummary[]> {
-    const projects = await this.projects.orderBy('createdAt').reverse().toArray();
-    return Promise.all(
-      projects.map(async (project) => ({
-        project,
-        lessonCount: await this.lessons.where('projectId').equals(project.id).count(),
-      })),
-    );
+  async cacheProjects(projects: CachedProject[]): Promise<void> {
+    await this.transaction('rw', this.projects, async () => {
+      await this.projects.clear();
+      await this.projects.bulkPut(projects);
+    });
   }
 
-  async getProject(id: string): Promise<Project | undefined> {
-    return this.projects.get(id);
+  async listCachedProjects(): Promise<CachedProject[]> {
+    return this.projects.orderBy('updatedAt').reverse().toArray();
   }
 
-  async listLessons(projectId: string): Promise<Lesson[]> {
+  // Upsert the lesson index for a project, preserving any HTML already cached.
+  async cacheLessonSummaries(projectId: string, summaries: LessonSummary[]): Promise<void> {
+    for (const s of summaries) {
+      const key = `${projectId}/${s.slug}`;
+      const existing = await this.lessons.get(key);
+      await this.lessons.put({
+        key,
+        projectId,
+        slug: s.slug,
+        seq: s.seq,
+        title: s.title,
+        recap: s.recap,
+        html: existing?.html,
+        cachedAt: existing?.cachedAt ?? new Date().toISOString(),
+      });
+    }
+  }
+
+  async cacheLesson(lesson: {
+    projectId: string;
+    slug: string;
+    seq: number;
+    title: string;
+    recap: string;
+    html: string;
+  }): Promise<void> {
+    await this.lessons.put({
+      ...lesson,
+      key: `${lesson.projectId}/${lesson.slug}`,
+      cachedAt: new Date().toISOString(),
+    });
+  }
+
+  async listCachedLessons(projectId: string): Promise<CachedLesson[]> {
     const lessons = await this.lessons.where('projectId').equals(projectId).toArray();
     return lessons.sort((a, b) => a.seq - b.seq);
   }
 
-  async getLesson(id: string): Promise<Lesson | undefined> {
-    return this.lessons.get(id);
+  async getCachedLesson(projectId: string, slug: string): Promise<CachedLesson | undefined> {
+    return this.lessons.get(`${projectId}/${slug}`);
   }
-
-  async getLessonBySlug(projectId: string, slug: string): Promise<Lesson | undefined> {
-    const matches = await this.lessons.where('slug').equals(slug).toArray();
-    return matches.find((lesson) => lesson.projectId === projectId);
-  }
-
-  async listLearningRecords(projectId: string): Promise<LearningRecord[]> {
-    const records = await this.learningRecords.where('projectId').equals(projectId).toArray();
-    return records.sort((a, b) => a.seq - b.seq);
-  }
-
-  async listMessages(projectId: string): Promise<Message[]> {
-    return this.messages.where('projectId').equals(projectId).sortBy('createdAt');
-  }
-
-  async addMessage(message: Message): Promise<void> {
-    await this.messages.add(message);
-  }
-
-  async updateMessage(id: string, changes: Partial<Message>): Promise<void> {
-    const existing = await this.messages.get(id);
-    if (!existing) return;
-    await this.messages.put({ ...existing, ...changes });
-  }
-
-  async saveGeneratedProject(mission: ProjectMission, done: DoneEvent): Promise<SavedGeneration> {
-    const projectId = crypto.randomUUID();
-    const lessonId = crypto.randomUUID();
-    const createdAt = new Date().toISOString();
-
-    const project: Project = {
-      id: projectId,
-      title: mission.topic,
-      mission,
-      glossary: mergeGlossary([], done.meta.glossaryUpdates),
-      resources: mergeResources([], done.meta.resourceUpdates),
-      createdAt,
-    };
-
-    const lesson: Lesson = {
-      id: lessonId,
-      projectId,
-      seq: 1,
-      slug: done.meta.slug,
-      title: done.meta.title,
-      primarySource: done.meta.primarySource,
-      linkedTerms: done.meta.linkedTerms,
-      recap: done.meta.recap,
-      html: done.html,
-      version: 1,
-      createdAt,
-    };
-
-    await this.transaction('rw', this.projects, this.lessons, async () => {
-      await this.projects.add(project);
-      await this.lessons.add(lesson);
-    });
-
-    return { projectId, lessonId };
-  }
-
-  async saveGeneratedLesson(projectId: string, done: DoneEvent): Promise<string> {
-    const lessonId = crypto.randomUUID();
-    const createdAt = new Date().toISOString();
-
-    return this.transaction('rw', this.projects, this.lessons, async () => {
-      const project = await this.projects.get(projectId);
-      if (!project) throw new Error('project not found');
-
-      const lastSeq = await this.lessons.where('projectId').equals(projectId).count();
-      const lesson: Lesson = {
-        id: lessonId,
-        projectId,
-        seq: lastSeq + 1,
-        slug: done.meta.slug,
-        title: done.meta.title,
-        primarySource: done.meta.primarySource,
-        linkedTerms: done.meta.linkedTerms,
-        recap: done.meta.recap,
-        html: done.html,
-        version: 1,
-        createdAt,
-      };
-
-      await this.lessons.add(lesson);
-      await this.projects.put({
-        ...project,
-        glossary: mergeGlossary(project.glossary, done.meta.glossaryUpdates),
-        resources: mergeResources(project.resources, done.meta.resourceUpdates),
-      });
-
-      return lessonId;
-    });
-  }
-}
-
-function mergeGlossary(base: GlossaryEntry[], updates: GlossaryEntry[]): GlossaryEntry[] {
-  const byTerm = new Map(base.map((entry) => [entry.term, entry]));
-  for (const entry of updates) byTerm.set(entry.term, entry);
-  return [...byTerm.values()];
-}
-
-function mergeResources(base: ResourceEntry[], updates: ResourceEntry[]): ResourceEntry[] {
-  const byUrl = new Map(base.map((entry) => [entry.url, entry]));
-  for (const entry of updates) byUrl.set(entry.url, entry);
-  return [...byUrl.values()];
 }
