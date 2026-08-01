@@ -14,7 +14,8 @@ COPY apps/api/package.json apps/api/
 RUN pnpm install
 COPY packages ./packages
 COPY apps ./apps
-RUN pnpm --filter api build
+# Trailing "..." builds api's workspace deps (api-types → dist) before api itself.
+RUN pnpm --filter "api..." build
 
 # ---- runtime: slim, non-root ---------------------------------------------
 FROM base AS runtime
