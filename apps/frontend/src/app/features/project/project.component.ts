@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideArrowLeft } from '@ng-icons/lucide';
+import { lucideArrowLeft, lucideBookOpen, lucideChevronDown } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
 import { TeacherChatComponent } from './teacher-chat.component';
@@ -15,7 +15,7 @@ interface LessonRow {
 @Component({
   selector: 'app-project',
   imports: [RouterLink, NgIcon, TeacherChatComponent],
-  viewProviders: [provideIcons({ lucideArrowLeft })],
+  viewProviders: [provideIcons({ lucideArrowLeft, lucideBookOpen, lucideChevronDown })],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
       <div class="w-full max-w-lg flex flex-col gap-5">
@@ -34,25 +34,51 @@ interface LessonRow {
         </header>
 
         @if (lessons().length > 0) {
-          <section class="flex flex-col">
-            @for (lesson of lessons(); track lesson.slug) {
-              <a
-                [routerLink]="['/lesson', id(), lesson.slug]"
-                class="flex items-center gap-3 py-3"
-                style="border-bottom:1px solid var(--line)"
+          <div
+            class="flex flex-col rounded-2xl overflow-hidden"
+            style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
+          >
+            <button
+              type="button"
+              (click)="expanded.set(!expanded())"
+              class="flex items-center gap-2 px-3.5 py-3 text-sm font-semibold"
+              style="color:var(--ink)"
+            >
+              <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
+              <span class="flex-1 text-left">
+                {{ lessons().length }} {{ lessons().length === 1 ? 'lesson' : 'lessons' }}
+              </span>
+              <ng-icon
+                name="lucideChevronDown"
+                size="16"
+                style="color:var(--muted);transition:transform .15s"
+                [style.transform]="expanded() ? 'rotate(180deg)' : 'none'"
+              />
+            </button>
+            @if (expanded()) {
+              <div
+                class="flex flex-col max-h-64 overflow-y-auto px-1.5 pb-1.5"
+                style="border-top:1px solid var(--line)"
               >
-                <span
-                  class="grid place-items-center w-7 h-7 rounded-lg text-xs font-bold shrink-0"
-                  style="background:var(--chip);color:var(--accent)"
-                >
-                  {{ pad(lesson.seq) }}
-                </span>
-                <span class="text-sm font-semibold" style="color:var(--ink)">{{
-                  lesson.title
-                }}</span>
-              </a>
+                @for (lesson of lessons(); track lesson.slug) {
+                  <a
+                    [routerLink]="['/lesson', id(), lesson.slug]"
+                    class="flex items-center gap-3 px-2 py-2.5 rounded-xl"
+                  >
+                    <span
+                      class="grid place-items-center w-7 h-7 rounded-lg text-xs font-bold shrink-0"
+                      style="background:var(--chip);color:var(--accent)"
+                    >
+                      {{ pad(lesson.seq) }}
+                    </span>
+                    <span class="text-sm font-semibold" style="color:var(--ink)">{{
+                      lesson.title
+                    }}</span>
+                  </a>
+                }
+              </div>
             }
-          </section>
+          </div>
         }
 
         @if (loaded()) {
@@ -71,6 +97,7 @@ export class ProjectComponent implements OnInit {
   protected readonly title = signal('New project');
   protected readonly lessons = signal<LessonRow[]>([]);
   protected readonly loaded = signal(false);
+  protected readonly expanded = signal(false);
 
   async ngOnInit(): Promise<void> {
     await this.reload();
