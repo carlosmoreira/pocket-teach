@@ -12,8 +12,10 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  lucideBookOpen,
   lucideLoaderCircle,
   lucideRotateCcw,
   lucideSend,
@@ -24,11 +26,17 @@ import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
 import type { GenerationPhase, Proposal } from '../../api/contracts';
 
+interface CreatedLesson {
+  slug: string;
+  title: string;
+}
+
 interface ChatMsg {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   proposal?: Proposal;
+  lesson?: CreatedLesson;
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -41,7 +49,7 @@ const PHASE_LABELS: Record<string, string> = {
 
 @Component({
   selector: 'app-teacher-chat',
-  imports: [FormsModule, NgIcon],
+  imports: [FormsModule, RouterLink, NgIcon],
   viewProviders: [
     provideIcons({
       lucideSend,
@@ -49,6 +57,7 @@ const PHASE_LABELS: Record<string, string> = {
       lucideLoaderCircle,
       lucideTriangleAlert,
       lucideRotateCcw,
+      lucideBookOpen,
     }),
   ],
   template: `
@@ -105,6 +114,32 @@ const PHASE_LABELS: Record<string, string> = {
                 </div>
               </div>
             }
+          }
+
+          @if (message.lesson; as lesson) {
+            <a
+              [routerLink]="['/lesson', projectId(), lesson.slug]"
+              class="self-start w-full rounded-2xl p-3.5 flex items-center gap-3"
+              style="background:var(--panel);border:1px solid var(--accent-2);box-shadow:var(--shadow)"
+            >
+              <span
+                class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0"
+                style="background:var(--accent-2)"
+              >
+                <ng-icon name="lucideBookOpen" size="18" />
+              </span>
+              <span class="flex flex-col min-w-0">
+                <span
+                  class="text-xs font-semibold uppercase tracking-wide"
+                  style="color:var(--accent-2)"
+                >
+                  Lesson ready · tap to read
+                </span>
+                <span class="text-sm font-semibold truncate" style="color:var(--ink)">{{
+                  lesson.title
+                }}</span>
+              </span>
+            </a>
           }
         }
 
@@ -246,15 +281,14 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     try {
       const transcript = await this.api.getTranscript(this.projectId());
-      const lastIdx = transcript.length - 1;
       this.messages.set(
-        transcript.map((m, i) => ({
+        transcript.map((m) => ({
           id: crypto.randomUUID(),
           role: m.role,
           content: m.content,
-          // Only the latest, still-open offer stays actionable; older or already
-          // confirmed proposals are stale (their lesson exists) — don't re-arm.
-          proposal: i === lastIdx && m.proposal && !m.proposal.confirmed ? m.proposal : undefined,
+          // Proposals are live offers, actionable only during the turn that
+          // produced them. On reload we never re-arm a card (the lesson list is
+          // the truth for what exists) — the offer text remains; ask again to act.
         })),
       );
       if (transcript.length === 0) await this.runChat(undefined);
@@ -327,6 +361,7 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     const proposal = message.proposal;
     if (!proposal) return;
 
+    let created: CreatedLesson | undefined;
     for await (const event of this.api.generateLesson(
       this.projectId(),
       { objective: this.genRequestObjective, focus: proposal.focus },
@@ -337,12 +372,18 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
           this.genPhase.set(event.phase);
           break;
         case 'lesson':
+          created = { slug: event.lesson.slug, title: event.lesson.title };
           await this.cacheLesson(event.lesson.slug);
           this.lessonCreated.emit();
           break;
         case 'done':
           this.clearProposal(message);
           this.generatingFor.set(null);
+          // Announce it inline with a tappable card so the teacher "says" it's
+          // done and you don't have to scroll up to find the lesson.
+          if (created) {
+            this.appendMessage('assistant', 'Done — your new lesson is ready.', undefined, created);
+          }
           return;
         case 'error':
           this.genError.set(event.message);
@@ -386,8 +427,13 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     }
   }
 
-  private appendMessage(role: 'user' | 'assistant', content: string, proposal?: Proposal): ChatMsg {
-    const message: ChatMsg = { id: crypto.randomUUID(), role, content, proposal };
+  private appendMessage(
+    role: 'user' | 'assistant',
+    content: string,
+    proposal?: Proposal,
+    lesson?: CreatedLesson,
+  ): ChatMsg {
+    const message: ChatMsg = { id: crypto.randomUUID(), role, content, proposal, lesson };
     this.messages.update((list) => [...list, message]);
     return message;
   }

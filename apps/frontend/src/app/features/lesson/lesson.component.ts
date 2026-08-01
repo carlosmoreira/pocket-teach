@@ -40,6 +40,8 @@ import { DbService } from '../../data/db.service';
         <p class="p-4 text-sm" style="color:var(--muted)">
           {{ error() ?? 'Lesson not found.' }}
         </p>
+      } @else {
+        <p class="p-4 text-sm" style="color:var(--muted)">Loading…</p>
       }
     </main>
   `,
