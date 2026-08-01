@@ -1,10 +1,10 @@
-export interface PrimarySource {
-  title: string;
-  url: string;
-}
+import type { LessonSummary, PrimarySource, ProjectSummary } from '@pocket-teach/api-types';
 
-// What the Teacher hands over to persist a lesson. The service owns numbering:
-// `slug` is the kebab base (e.g. "borrowing") and becomes "0002-borrowing".
+export type { LessonSummary, PrimarySource, ProjectSummary };
+
+// What the Teacher hands over to persist a lesson (backend-only). The service
+// owns numbering: `slug` is the kebab base (e.g. "borrowing") and becomes
+// "0002-borrowing".
 export interface LessonInput {
   slug: string;
   title: string;
@@ -12,23 +12,4 @@ export interface LessonInput {
   primarySource: PrimarySource;
   linkedTerms?: string[];
   html: string;
-}
-
-export interface LessonSummary {
-  seq: number;
-  slug: string;
-  title: string;
-  recap: string;
-  primarySource: PrimarySource;
-  linkedTerms: string[];
-  file: string;
-  createdAt: string;
-}
-
-export interface ProjectSummary {
-  id: string;
-  title: string;
-  lessonCount: number;
-  createdAt: string;
-  updatedAt: string;
 }
