@@ -1,6 +1,6 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowLeft } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
@@ -29,10 +29,10 @@ import { DbService } from '../../data/db.service';
         </h1>
       </header>
 
-      @if (srcdoc(); as html) {
+      @if (src(); as url) {
         <iframe
           class="flex-1 w-full border-0"
-          [srcdoc]="html"
+          [src]="url"
           sandbox="allow-scripts"
           title="Lesson"
         ></iframe>
@@ -46,7 +46,7 @@ import { DbService } from '../../data/db.service';
     </main>
   `,
 })
-export class LessonComponent implements OnInit {
+export class LessonComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
   private readonly sanitizer = inject(DomSanitizer);
@@ -55,9 +55,11 @@ export class LessonComponent implements OnInit {
   readonly slug = input.required<string>();
 
   protected readonly title = signal('Lesson');
-  protected readonly srcdoc = signal<SafeHtml | null>(null);
+  protected readonly src = signal<SafeResourceUrl | null>(null);
   protected readonly loaded = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  private objectUrl: string | null = null;
 
   async ngOnInit(): Promise<void> {
     // Offline replica first, so a saved lesson reads without the backend.
@@ -81,7 +83,7 @@ export class LessonComponent implements OnInit {
       });
     } catch (err) {
       // Only an error if we have nothing rendered (no cached html and offline).
-      if (!this.srcdoc()) {
+      if (!this.src()) {
         this.error.set(err instanceof Error ? err.message : 'Could not load the lesson.');
       }
     } finally {
@@ -89,7 +91,23 @@ export class LessonComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.revoke();
+  }
+
+  // Load the lesson as a real document via a blob URL rather than a giant inline
+  // srcdoc attribute — more robust across browsers for large HTML.
   private render(html: string): void {
-    this.srcdoc.set(this.sanitizer.bypassSecurityTrustHtml(html));
+    this.revoke();
+    const blob = new Blob([html], { type: 'text/html' });
+    this.objectUrl = URL.createObjectURL(blob);
+    this.src.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.objectUrl));
+  }
+
+  private revoke(): void {
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = null;
+    }
   }
 }
