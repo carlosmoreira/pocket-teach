@@ -18,7 +18,7 @@ interface LessonRow {
   viewProviders: [provideIcons({ lucideArrowLeft, lucideBookOpen, lucideChevronDown })],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
-      <div class="w-full max-w-lg flex flex-col gap-5">
+      <div class="w-full max-w-lg lg:max-w-5xl flex flex-col gap-5">
         <header class="flex items-center gap-3">
           <a
             routerLink="/library"
@@ -33,32 +33,72 @@ interface LessonRow {
           </h1>
         </header>
 
-        @if (lessons().length > 0) {
-          <div
-            class="flex flex-col rounded-2xl overflow-hidden"
-            style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
-          >
-            <button
-              type="button"
-              (click)="expanded.set(!expanded())"
-              class="flex items-center gap-2 px-3.5 py-3 text-sm font-semibold"
-              style="color:var(--ink)"
+        <div class="flex flex-col gap-5 lg:flex-row lg:gap-6 lg:items-start">
+          @if (lessons().length > 0) {
+            <!-- Mobile: a compact collapsible bar so the chat stays visible -->
+            <div
+              class="lg:hidden flex flex-col rounded-2xl overflow-hidden"
+              style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
             >
-              <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
-              <span class="flex-1 text-left">
-                {{ lessons().length }} {{ lessons().length === 1 ? 'lesson' : 'lessons' }}
-              </span>
-              <ng-icon
-                name="lucideChevronDown"
-                size="16"
-                style="color:var(--muted);transition:transform .15s"
-                [style.transform]="expanded() ? 'rotate(180deg)' : 'none'"
-              />
-            </button>
-            @if (expanded()) {
+              <button
+                type="button"
+                (click)="expanded.set(!expanded())"
+                class="flex items-center gap-2 px-3.5 py-3 text-sm font-semibold"
+                style="color:var(--ink)"
+              >
+                <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
+                <span class="flex-1 text-left">
+                  {{ lessons().length }} {{ lessons().length === 1 ? 'lesson' : 'lessons' }}
+                </span>
+                <ng-icon
+                  name="lucideChevronDown"
+                  size="16"
+                  style="color:var(--muted);transition:transform .15s"
+                  [style.transform]="expanded() ? 'rotate(180deg)' : 'none'"
+                />
+              </button>
+              @if (expanded()) {
+                <div
+                  class="flex flex-col max-h-64 overflow-y-auto px-1.5 pb-1.5"
+                  style="border-top:1px solid var(--line)"
+                >
+                  @for (lesson of lessons(); track lesson.slug) {
+                    <a
+                      [routerLink]="['/lesson', id(), lesson.slug]"
+                      class="flex items-center gap-3 px-2 py-2.5 rounded-xl"
+                    >
+                      <span
+                        class="grid place-items-center w-7 h-7 rounded-lg text-xs font-bold shrink-0"
+                        style="background:var(--chip);color:var(--accent)"
+                      >
+                        {{ pad(lesson.seq) }}
+                      </span>
+                      <span class="text-sm font-semibold" style="color:var(--ink)">{{
+                        lesson.title
+                      }}</span>
+                    </a>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Desktop: lessons sidebar beside the chat -->
+            <aside
+              class="hidden lg:flex lg:flex-col lg:w-72 lg:shrink-0 rounded-2xl overflow-hidden"
+              style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
+            >
               <div
-                class="flex flex-col max-h-64 overflow-y-auto px-1.5 pb-1.5"
-                style="border-top:1px solid var(--line)"
+                class="flex items-center gap-2 px-3.5 py-3 text-sm font-semibold"
+                style="color:var(--ink)"
+              >
+                <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
+                <span
+                  >{{ lessons().length }} {{ lessons().length === 1 ? 'lesson' : 'lessons' }}</span
+                >
+              </div>
+              <div
+                class="flex flex-col px-1.5 pb-1.5 overflow-y-auto"
+                style="max-height:calc(100dvh - 9rem);border-top:1px solid var(--line)"
               >
                 @for (lesson of lessons(); track lesson.slug) {
                   <a
@@ -77,13 +117,15 @@ interface LessonRow {
                   </a>
                 }
               </div>
+            </aside>
+          }
+
+          <div class="flex-1 min-w-0">
+            @if (loaded()) {
+              <app-teacher-chat [projectId]="id()" (lessonCreated)="reload()" />
             }
           </div>
-        }
-
-        @if (loaded()) {
-          <app-teacher-chat [projectId]="id()" (lessonCreated)="reload()" />
-        }
+        </div>
       </div>
     </main>
   `,
