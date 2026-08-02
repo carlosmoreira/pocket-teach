@@ -167,7 +167,7 @@ function isChatEvent(value: unknown): value is ChatEvent {
   return type !== null && CHAT_TYPES.includes(type);
 }
 
-const GENERATION_TYPES = ['phase', 'lesson', 'done', 'error'];
+const GENERATION_TYPES = ['phase', 'activity', 'progress', 'lesson', 'done', 'error'];
 function isGenerationEvent(value: unknown): value is GenerationEvent {
   const type = eventType(value);
   return type !== null && GENERATION_TYPES.includes(type);
