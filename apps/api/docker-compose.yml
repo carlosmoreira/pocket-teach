@@ -7,9 +7,9 @@ services:
     image: pocket-teach-api
     env_file: .env
     environment:
-      PORT: ${PORT:-8787}
+      PORT: ${PORT:-1212}
     ports:
-      - '${PORT:-8787}:${PORT:-8787}'
+      - '${PORT:-1212}:${PORT:-1212}'
     volumes:
       # Persist the git-backed project workspaces across restarts (ADR 0001).
       - ./data:/app/apps/api/data

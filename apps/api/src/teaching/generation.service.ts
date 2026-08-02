@@ -1,5 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { hasToolCall, stepCountIs, streamText, tool, type ToolSet } from 'ai';
+import {
+  hasToolCall,
+  stepCountIs,
+  streamText,
+  tool,
+  type SystemModelMessage,
+  type ToolSet,
+} from 'ai';
 import { z } from 'zod';
 import { LLM_PROVIDER, type LlmProvider } from '../providers/llm-provider';
 import { WorkspaceService } from '../workspace/workspace.service';
@@ -14,6 +21,9 @@ import {
 import type { EmitGeneration } from './generation.events';
 
 const MAX_STEPS = 16;
+// Emit a writing-progress tick roughly every this many streamed characters, so
+// the counter moves visibly without flooding the SSE channel.
+const PROGRESS_STEP = 400;
 // Generous so a long research pass plus the full lesson HTML (passed as the
 // write_lesson tool argument) never truncates mid-call and fails validation.
 const MAX_OUTPUT_TOKENS = 32000;
@@ -110,9 +120,18 @@ export class GenerationService {
 
       const result = streamText({
         model: this.provider.languageModel(),
-        system: [SYSTEM_PREAMBLE, GENERATION_PROMPT, `# Workspace context\n${context}`].join(
-          '\n\n',
-        ),
+        // The large, invariant instructions are marked cacheable so repeated
+        // generations reuse them (faster first token, cheaper). The per-project
+        // workspace context is a second, uncached system block after the cache
+        // breakpoint, so a changing workspace never busts the cached prefix.
+        system: [
+          {
+            role: 'system',
+            content: [SYSTEM_PREAMBLE, GENERATION_PROMPT].join('\n\n'),
+            providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+          },
+          { role: 'system', content: `# Workspace context\n${context}` },
+        ] satisfies SystemModelMessage[],
         messages: [{ role: 'user', content: instruction(opts) }],
         tools,
         // Stop the instant the lesson is written. Letting the loop run another
@@ -122,16 +141,52 @@ export class GenerationService {
         maxOutputTokens: MAX_OUTPUT_TOKENS,
       });
 
+      // Surface the agent's actual steps as they stream so the wait reads as a
+      // live feed. The write_lesson html arrives as a streamed tool input; we
+      // count its characters (throttled) to show the lesson taking shape.
+      let writeInputId: string | undefined;
+      let chars = 0;
+      let lastEmitted = 0;
+      let lastActivity = '';
+
+      const startWriting = () => {
+        if (writing) return;
+        writing = true;
+        emit({ type: 'phase', phase: 'writing' });
+      };
+
       for await (const part of result.fullStream) {
         if (part.type === 'tool-call') {
           if (part.toolName === 'write_lesson') {
-            if (!writing) {
-              writing = true;
-              emit({ type: 'phase', phase: 'writing' });
+            startWriting();
+          } else {
+            if (!researching) {
+              researching = true;
+              emit({ type: 'phase', phase: 'researching' });
             }
-          } else if (!researching) {
-            researching = true;
-            emit({ type: 'phase', phase: 'researching' });
+            const detail = activityDetail(part.toolName, part.input);
+            // The model often repeats a query across steps; collapse consecutive
+            // duplicates so the feed doesn't stutter the same line.
+            if (detail) {
+              const key = `${detail.kind}:${detail.detail}`;
+              if (key !== lastActivity) {
+                lastActivity = key;
+                emit(detail);
+              }
+            }
+          }
+        } else if (part.type === 'tool-input-start') {
+          if (part.toolName === 'write_lesson') {
+            writeInputId = part.id;
+            startWriting();
+          }
+        } else if (part.type === 'tool-input-delta') {
+          if (part.id === writeInputId) {
+            chars += part.delta.length;
+            if (chars - lastEmitted >= PROGRESS_STEP) {
+              lastEmitted = chars;
+              emit({ type: 'progress', chars });
+            }
           }
         } else if (part.type === 'error') {
           throw part.error;
@@ -153,8 +208,47 @@ export class GenerationService {
       emit({ type: 'error', message });
       return;
     }
+
+    // Persist the "lesson ready" announcement so the confirmation survives a
+    // reload (the client also shows it live).
+    await this.workspace.appendTranscript(projectId, {
+      role: 'assistant',
+      content: 'Done — your new lesson is ready.',
+      lesson: { slug: written.slug, title: written.title },
+      at: new Date().toISOString(),
+    });
+
     emit({ type: 'phase', phase: 'done' });
     emit({ type: 'done' });
+  }
+}
+
+// Translate a research tool call into a feed line. web search carries a query;
+// web fetch (and read_lesson) carry the thing being opened. Unknown tools emit
+// nothing rather than a confusing raw payload.
+function activityDetail(
+  toolName: string,
+  input: unknown,
+): { type: 'activity'; kind: 'search' | 'read'; detail: string } | undefined {
+  const args = (input ?? {}) as { query?: unknown; url?: unknown; slug?: unknown };
+  const name = toolName.toLowerCase();
+  if (name.includes('search') && typeof args.query === 'string' && args.query.trim()) {
+    return { type: 'activity', kind: 'search', detail: args.query.trim() };
+  }
+  if (name.includes('fetch') && typeof args.url === 'string' && args.url.trim()) {
+    return { type: 'activity', kind: 'read', detail: prettyUrl(args.url.trim()) };
+  }
+  if (toolName === 'read_lesson' && typeof args.slug === 'string' && args.slug.trim()) {
+    return { type: 'activity', kind: 'read', detail: `earlier lesson · ${args.slug.trim()}` };
+  }
+  return undefined;
+}
+
+function prettyUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
   }
 }
 

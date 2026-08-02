@@ -12,36 +12,57 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  lucideBookOpen,
+  lucideCheck,
+  lucideGlobe,
   lucideLoaderCircle,
+  lucidePenLine,
   lucideRotateCcw,
+  lucideSearch,
   lucideSend,
   lucideTriangleAlert,
   lucideWandSparkles,
 } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
+import { NotificationService } from '../../data/notification.service';
 import type { GenerationPhase, Proposal } from '../../api/contracts';
+
+interface CreatedLesson {
+  slug: string;
+  title: string;
+}
 
 interface ChatMsg {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   proposal?: Proposal;
+  lesson?: CreatedLesson;
+  // True only for a lesson card appended live on completion, so the arrival
+  // animation plays once and not on every transcript reload.
+  justArrived?: boolean;
 }
 
-const PHASE_LABELS: Record<string, string> = {
-  planning: 'reading your workspace…',
-  researching: 'grounding in trusted sources…',
-  writing: 'writing the lesson…',
-  done: 'saving…',
-  error: '',
+type FeedIcon = 'search' | 'read' | 'write';
+interface FeedLine {
+  icon: FeedIcon;
+  text: string;
+}
+
+const PHASE_ORDER: GenerationPhase[] = ['planning', 'researching', 'writing', 'done'];
+const FEED_ICONS: Record<FeedIcon, string> = {
+  search: 'lucideSearch',
+  read: 'lucideGlobe',
+  write: 'lucidePenLine',
 };
 
 @Component({
   selector: 'app-teacher-chat',
-  imports: [FormsModule, NgIcon],
+  imports: [FormsModule, RouterLink, NgIcon],
   viewProviders: [
     provideIcons({
       lucideSend,
@@ -49,11 +70,34 @@ const PHASE_LABELS: Record<string, string> = {
       lucideLoaderCircle,
       lucideTriangleAlert,
       lucideRotateCcw,
+      lucideBookOpen,
+      lucideCheck,
+      lucideSearch,
+      lucideGlobe,
+      lucidePenLine,
     }),
   ],
   template: `
     <section class="flex flex-col gap-3">
-      <h2 class="text-sm font-bold" style="color:var(--ink)">Teacher</h2>
+      <div class="flex items-center gap-2.5">
+        <span
+          class="grid place-items-center w-9 h-9 rounded-full shrink-0 text-white"
+          style="background:radial-gradient(120% 120% at 30% 25%, var(--accent) 0%, #6f69e0 55%, var(--accent-2) 130%);font-family:var(--serif);font-weight:700;font-size:16px;box-shadow:0 0 0 3px var(--accent-soft)"
+          >N</span
+        >
+        <div class="flex flex-col leading-tight">
+          <h2
+            style="margin:0;font-family:var(--serif);font-weight:600;font-size:15px;color:var(--ink)"
+          >
+            Nestor
+          </h2>
+          <span
+            class="font-mono-label"
+            style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint)"
+            >your teacher</span
+          >
+        </div>
+      </div>
 
       <div #scrollBox class="flex flex-col gap-2.5 max-h-[55vh] overflow-y-auto pb-1">
         @for (message of messages(); track message.id) {
@@ -61,6 +105,8 @@ const PHASE_LABELS: Record<string, string> = {
             class="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap"
             [class.self-end]="message.role === 'user'"
             [class.self-start]="message.role === 'assistant'"
+            [class.rounded-tr-sm]="message.role === 'user'"
+            [class.rounded-tl-sm]="message.role === 'assistant'"
             [style]="message.role === 'user' ? userBubble : teacherBubble"
           >
             {{ message.content }}
@@ -79,9 +125,10 @@ const PHASE_LABELS: Record<string, string> = {
                   <ng-icon name="lucideWandSparkles" size="14" />
                   {{ proposal.kind === 'amplify' ? 'Clarify lesson' : 'New lesson' }}
                 </span>
-                <span class="text-sm font-semibold" style="color:var(--ink)">{{
-                  proposal.objective
-                }}</span>
+                <span
+                  style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14.5px"
+                  >{{ proposal.objective }}</span
+                >
                 <span class="text-xs" style="color:var(--muted)">{{ proposal.rationale }}</span>
                 <div class="flex gap-2 mt-1">
                   <button
@@ -105,6 +152,35 @@ const PHASE_LABELS: Record<string, string> = {
                 </div>
               </div>
             }
+          }
+
+          @if (message.lesson; as lesson) {
+            <a
+              [routerLink]="['/lesson', projectId(), lesson.slug]"
+              [class.pt-arrive]="message.justArrived"
+              class="self-start w-full rounded-2xl p-3.5 flex items-center gap-3"
+              style="background:var(--panel);border:1px solid var(--accent-2);box-shadow:var(--shadow)"
+            >
+              <span
+                class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0"
+                style="background:var(--accent-2)"
+              >
+                <ng-icon name="lucideBookOpen" size="18" />
+              </span>
+              <span class="flex flex-col min-w-0">
+                <span
+                  class="text-xs font-semibold uppercase tracking-wide"
+                  style="color:var(--accent-2)"
+                >
+                  Lesson ready · tap to read
+                </span>
+                <span
+                  class="truncate"
+                  style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14.5px"
+                  >{{ lesson.title }}</span
+                >
+              </span>
+            </a>
           }
         }
 
@@ -154,24 +230,75 @@ const PHASE_LABELS: Record<string, string> = {
             </div>
           } @else {
             <div
-              class="flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5"
-              style="background:color-mix(in srgb,var(--accent) 10%,var(--panel));border:1px solid var(--accent)"
+              class="flex flex-col gap-2.5 rounded-2xl px-3.5 py-3"
+              style="background:color-mix(in srgb,var(--accent) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line))"
             >
-              <ng-icon
-                name="lucideLoaderCircle"
-                size="18"
-                class="animate-spin"
-                style="color:var(--accent)"
-              />
-              <span class="flex flex-col min-w-0">
-                <span class="text-sm font-semibold" style="color:var(--ink)"
-                  >Creating your lesson…
-                  <span style="color:var(--muted);font-weight:400">{{ genPhaseLabel() }}</span>
+              <div class="flex items-center gap-2">
+                <ng-icon
+                  name="lucideLoaderCircle"
+                  size="16"
+                  class="animate-spin"
+                  style="color:var(--accent)"
+                />
+                <span
+                  style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14px"
+                >
+                  Composing your lesson
                 </span>
-                @if (generatingObjective(); as obj) {
-                  <span class="text-xs truncate" style="color:var(--muted)">{{ obj }}</span>
+                <span class="ml-auto text-xs tabular-nums" style="color:var(--muted)">
+                  {{ elapsedLabel() }}
+                </span>
+              </div>
+
+              <div
+                class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide"
+              >
+                @for (step of steps(); track step.label; let last = $last) {
+                  <span
+                    class="flex items-center gap-1"
+                    [style.color]="step.state === 'todo' ? 'var(--muted)' : 'var(--accent)'"
+                    [style.opacity]="step.state === 'todo' ? '0.6' : '1'"
+                  >
+                    @if (step.state === 'done') {
+                      <ng-icon name="lucideCheck" size="12" />
+                    } @else if (step.state === 'active') {
+                      <ng-icon name="lucideLoaderCircle" size="12" class="animate-spin" />
+                    } @else {
+                      <span
+                        class="inline-block w-1.5 h-1.5 rounded-full"
+                        style="background:var(--muted)"
+                      ></span>
+                    }
+                    {{ step.label }}
+                  </span>
+                  @if (!last) {
+                    <span style="color:var(--line)">·</span>
+                  }
                 }
-              </span>
+              </div>
+
+              @if (feed().length > 0) {
+                <div class="flex flex-col gap-1">
+                  @for (line of feed(); track $index; let last = $last) {
+                    <span
+                      class="flex items-center gap-2 text-xs min-w-0"
+                      [style.color]="last ? 'var(--ink)' : 'var(--muted)'"
+                      [style.opacity]="last ? '1' : '0.55'"
+                    >
+                      <ng-icon
+                        [name]="feedIcon(line.icon)"
+                        size="13"
+                        style="color:var(--accent-2);flex:none"
+                      />
+                      <span class="truncate">{{ line.text }}</span>
+                    </span>
+                  }
+                </div>
+              }
+
+              @if (generatingObjective(); as obj) {
+                <span class="text-xs truncate" style="color:var(--muted)">{{ obj }}</span>
+              }
             </div>
           }
         }
@@ -206,6 +333,7 @@ const PHASE_LABELS: Record<string, string> = {
 export class TeacherChatComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
+  private readonly notifications = inject(NotificationService);
   private readonly abort = new AbortController();
 
   readonly projectId = input.required<string>();
@@ -224,6 +352,35 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
   });
   protected readonly genPhase = signal<GenerationPhase | null>(null);
   protected readonly genError = signal<string | null>(null);
+  private readonly activities = signal<{ kind: 'search' | 'read'; detail: string }[]>([]);
+  private readonly genChars = signal(0);
+  protected readonly elapsed = signal(0);
+  private timer?: ReturnType<typeof setInterval>;
+
+  protected readonly steps = computed(() => {
+    const current = PHASE_ORDER.indexOf(this.genPhase() ?? 'planning');
+    return (['Plan', 'Research', 'Write'] as const).map((label, i) => ({
+      label,
+      state: current > i ? 'done' : current === i ? 'active' : 'todo',
+    }));
+  });
+
+  // The last few research steps, newest last, plus a live writing line once the
+  // lesson body starts streaming — the opaque wait rendered as an activity feed.
+  protected readonly feed = computed<FeedLine[]>(() => {
+    const lines: FeedLine[] = this.activities()
+      .slice(-3)
+      .map((a) => ({ icon: a.kind, text: a.detail }));
+    if (this.genPhase() === 'writing') {
+      const n = this.genChars();
+      lines.push({
+        icon: 'write',
+        text:
+          n > 0 ? `Writing the lesson · ${n.toLocaleString()} characters` : 'Writing the lesson…',
+      });
+    }
+    return lines;
+  });
 
   protected readonly userBubble = 'background:var(--accent);color:#fff';
   protected readonly teacherBubble =
@@ -246,15 +403,16 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     try {
       const transcript = await this.api.getTranscript(this.projectId());
-      const lastIdx = transcript.length - 1;
       this.messages.set(
-        transcript.map((m, i) => ({
+        transcript.map((m) => ({
           id: crypto.randomUUID(),
           role: m.role,
           content: m.content,
-          // Only the latest, still-open offer stays actionable; older or already
-          // confirmed proposals are stale (their lesson exists) — don't re-arm.
-          proposal: i === lastIdx && m.proposal && !m.proposal.confirmed ? m.proposal : undefined,
+          // Proposals are live offers, actionable only during the turn that
+          // produced them. On reload we never re-arm a card (the lesson list is
+          // the truth for what exists) — the offer text remains; ask again to act.
+          // Lesson-ready cards, though, are persisted and re-shown.
+          lesson: m.lesson,
         })),
       );
       if (transcript.length === 0) await this.runChat(undefined);
@@ -265,10 +423,16 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.abort.abort();
+    this.stopTimer();
   }
 
-  protected genPhaseLabel(): string {
-    return PHASE_LABELS[this.genPhase() ?? 'planning'] ?? 'starting…';
+  protected elapsedLabel(): string {
+    const s = this.elapsed();
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  protected feedIcon(icon: FeedIcon): string {
+    return FEED_ICONS[icon];
   }
 
   protected onEnter(event: Event): void {
@@ -316,38 +480,83 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
 
   protected async createLesson(message: ChatMsg): Promise<void> {
     if (!message.proposal) return;
+    // Ask to notify now, while they've just acted and are about to wait.
+    void this.notifications.ensurePermission();
     this.genRequestObjective = message.proposal.objective;
     this.generatingFor.set(message.id);
     await this.runLessonGeneration(message);
   }
 
   protected async runLessonGeneration(message: ChatMsg): Promise<void> {
-    this.genPhase.set(null);
-    this.genError.set(null);
     const proposal = message.proposal;
     if (!proposal) return;
 
-    for await (const event of this.api.generateLesson(
-      this.projectId(),
-      { objective: this.genRequestObjective, focus: proposal.focus },
-      this.abort.signal,
-    )) {
-      switch (event.type) {
-        case 'phase':
-          this.genPhase.set(event.phase);
-          break;
-        case 'lesson':
-          await this.cacheLesson(event.lesson.slug);
-          this.lessonCreated.emit();
-          break;
-        case 'done':
-          this.clearProposal(message);
-          this.generatingFor.set(null);
-          return;
-        case 'error':
-          this.genError.set(event.message);
-          return;
+    this.genPhase.set(null);
+    this.genError.set(null);
+    this.activities.set([]);
+    this.genChars.set(0);
+    this.startTimer();
+
+    let created: CreatedLesson | undefined;
+    try {
+      for await (const event of this.api.generateLesson(
+        this.projectId(),
+        { objective: this.genRequestObjective, focus: proposal.focus },
+        this.abort.signal,
+      )) {
+        switch (event.type) {
+          case 'phase':
+            this.genPhase.set(event.phase);
+            break;
+          case 'activity':
+            this.activities.update((list) =>
+              [...list, { kind: event.kind, detail: event.detail }].slice(-6),
+            );
+            break;
+          case 'progress':
+            this.genChars.set(event.chars);
+            break;
+          case 'lesson':
+            created = { slug: event.lesson.slug, title: event.lesson.title };
+            await this.cacheLesson(event.lesson.slug);
+            this.lessonCreated.emit();
+            break;
+          case 'done':
+            this.clearProposal(message);
+            this.generatingFor.set(null);
+            // Announce it inline with a tappable card so the teacher "says" it's
+            // done and you don't have to scroll up to find the lesson.
+            if (created) {
+              this.appendMessage(
+                'assistant',
+                'Done — your new lesson is ready.',
+                undefined,
+                created,
+                true,
+              );
+              this.notifications.lessonReady(created.title);
+            }
+            return;
+          case 'error':
+            this.genError.set(event.message);
+            return;
+        }
       }
+    } finally {
+      this.stopTimer();
+    }
+  }
+
+  private startTimer(): void {
+    this.stopTimer();
+    this.elapsed.set(0);
+    this.timer = setInterval(() => this.elapsed.update((s) => s + 1), 1000);
+  }
+
+  private stopTimer(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = undefined;
     }
   }
 
@@ -386,8 +595,21 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     }
   }
 
-  private appendMessage(role: 'user' | 'assistant', content: string, proposal?: Proposal): ChatMsg {
-    const message: ChatMsg = { id: crypto.randomUUID(), role, content, proposal };
+  private appendMessage(
+    role: 'user' | 'assistant',
+    content: string,
+    proposal?: Proposal,
+    lesson?: CreatedLesson,
+    justArrived = false,
+  ): ChatMsg {
+    const message: ChatMsg = {
+      id: crypto.randomUUID(),
+      role,
+      content,
+      proposal,
+      lesson,
+      justArrived,
+    };
     this.messages.update((list) => [...list, message]);
     return message;
   }

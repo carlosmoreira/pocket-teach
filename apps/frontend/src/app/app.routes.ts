@@ -16,11 +16,6 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/lesson/lesson.component').then((m) => m.LessonComponent),
   },
-  {
-    path: 'settings',
-    loadComponent: () =>
-      import('./features/settings/settings.component').then((m) => m.SettingsComponent),
-  },
   { path: '', pathMatch: 'full', redirectTo: 'library' },
   { path: '**', redirectTo: 'library' },
 ];

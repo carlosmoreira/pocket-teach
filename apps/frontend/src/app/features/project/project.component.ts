@@ -1,24 +1,29 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideArrowLeft } from '@ng-icons/lucide';
+import { lucideArrowLeft, lucideBookOpen, lucideChevronDown, lucideTrash2 } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
 import { TeacherChatComponent } from './teacher-chat.component';
+
+type LessonState = 'read' | 'new' | 'unread';
 
 interface LessonRow {
   slug: string;
   seq: number;
   title: string;
+  state: LessonState;
 }
 
 @Component({
   selector: 'app-project',
   imports: [RouterLink, NgIcon, TeacherChatComponent],
-  viewProviders: [provideIcons({ lucideArrowLeft })],
+  viewProviders: [
+    provideIcons({ lucideArrowLeft, lucideBookOpen, lucideChevronDown, lucideTrash2 }),
+  ],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
-      <div class="w-full max-w-lg flex flex-col gap-5">
+      <div class="w-full max-w-lg lg:max-w-5xl flex flex-col gap-5">
         <header class="flex items-center gap-3">
           <a
             routerLink="/library"
@@ -28,36 +33,134 @@ interface LessonRow {
           >
             <ng-icon name="lucideArrowLeft" size="18" />
           </a>
-          <h1 class="text-lg font-bold tracking-tight truncate" style="color:var(--ink)">
+          <h1
+            class="truncate flex-1 text-xl"
+            style="color:var(--ink);font-family:var(--serif);font-weight:600;letter-spacing:-0.01em"
+          >
             {{ title() }}
           </h1>
+          <button
+            type="button"
+            (click)="remove()"
+            [disabled]="deleting()"
+            class="grid place-items-center w-9 h-9 rounded-xl shrink-0 disabled:opacity-40"
+            style="background:var(--panel);border:1px solid var(--line);color:var(--muted)"
+            aria-label="Delete project"
+          >
+            <ng-icon name="lucideTrash2" size="18" />
+          </button>
         </header>
 
-        @if (lessons().length > 0) {
-          <section class="flex flex-col">
-            @for (lesson of lessons(); track lesson.slug) {
-              <a
-                [routerLink]="['/lesson', id(), lesson.slug]"
-                class="flex items-center gap-3 py-3"
-                style="border-bottom:1px solid var(--line)"
-              >
-                <span
-                  class="grid place-items-center w-7 h-7 rounded-lg text-xs font-bold shrink-0"
-                  style="background:var(--chip);color:var(--accent)"
-                >
-                  {{ pad(lesson.seq) }}
-                </span>
-                <span class="text-sm font-semibold" style="color:var(--ink)">{{
-                  lesson.title
-                }}</span>
-              </a>
-            }
-          </section>
+        @if (deleteError(); as msg) {
+          <p
+            class="rounded-xl px-3.5 py-2.5 text-sm"
+            style="background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)"
+          >
+            {{ msg }}
+          </p>
         }
 
-        @if (loaded()) {
-          <app-teacher-chat [projectId]="id()" (lessonCreated)="reload()" />
-        }
+        <div class="flex flex-col gap-5 lg:flex-row lg:gap-6 lg:items-start">
+          @if (lessons().length > 0) {
+            <!-- Mobile: a compact collapsible bar so the chat stays visible -->
+            <div
+              class="lg:hidden flex flex-col rounded-2xl overflow-hidden"
+              style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
+            >
+              <button
+                type="button"
+                (click)="expanded.set(!expanded())"
+                class="flex items-center gap-2 px-3.5 py-3 text-sm font-semibold"
+                style="color:var(--ink)"
+              >
+                <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
+                <span
+                  class="flex-1 text-left font-mono-label"
+                  style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint)"
+                >
+                  {{ pad(lessons().length) }}
+                  {{ lessons().length === 1 ? 'lesson' : 'lessons' }}
+                </span>
+                <ng-icon
+                  name="lucideChevronDown"
+                  size="16"
+                  style="color:var(--muted);transition:transform .15s"
+                  [style.transform]="expanded() ? 'rotate(180deg)' : 'none'"
+                />
+              </button>
+              @if (expanded()) {
+                <div
+                  class="flex flex-col max-h-64 overflow-y-auto px-1.5 pb-1.5"
+                  style="border-top:1px solid var(--line)"
+                >
+                  @for (lesson of lessons(); track lesson.slug) {
+                    <a
+                      [routerLink]="['/lesson', id(), lesson.slug]"
+                      class="flex items-center gap-3 px-2 py-2.5 rounded-xl"
+                    >
+                      <span
+                        class="grid place-items-center w-7 h-7 rounded-lg text-xs shrink-0 font-mono-label"
+                        [style]="chipStyle(lesson)"
+                      >
+                        {{ pad(lesson.seq) }}
+                      </span>
+                      <span
+                        class="truncate"
+                        style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14px"
+                        >{{ lesson.title }}</span
+                      >
+                    </a>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Desktop: lessons sidebar beside the chat -->
+            <aside
+              class="hidden lg:flex lg:flex-col lg:w-72 lg:shrink-0 rounded-2xl overflow-hidden"
+              style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
+            >
+              <div class="flex items-center gap-2 px-3.5 py-3" style="color:var(--ink)">
+                <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
+                <span
+                  class="font-mono-label"
+                  style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint)"
+                  >{{ pad(lessons().length) }}
+                  {{ lessons().length === 1 ? 'lesson' : 'lessons' }}</span
+                >
+              </div>
+              <div
+                class="flex flex-col px-1.5 pb-1.5 overflow-y-auto"
+                style="max-height:calc(100dvh - 9rem);border-top:1px solid var(--line)"
+              >
+                @for (lesson of lessons(); track lesson.slug) {
+                  <a
+                    [routerLink]="['/lesson', id(), lesson.slug]"
+                    class="flex items-center gap-3 px-2 py-2.5 rounded-xl"
+                  >
+                    <span
+                      class="grid place-items-center w-7 h-7 rounded-lg text-xs shrink-0 font-mono-label"
+                      [style]="chipStyle(lesson)"
+                    >
+                      {{ pad(lesson.seq) }}
+                    </span>
+                    <span
+                      class="truncate"
+                      style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14px"
+                      >{{ lesson.title }}</span
+                    >
+                  </a>
+                }
+              </div>
+            </aside>
+          }
+
+          <div class="flex-1 min-w-0">
+            @if (loaded()) {
+              <app-teacher-chat [projectId]="id()" (lessonCreated)="reload()" />
+            }
+          </div>
+        </div>
       </div>
     </main>
   `,
@@ -65,12 +168,16 @@ interface LessonRow {
 export class ProjectComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
+  private readonly router = inject(Router);
 
   readonly id = input.required<string>();
 
   protected readonly title = signal('New project');
   protected readonly lessons = signal<LessonRow[]>([]);
   protected readonly loaded = signal(false);
+  protected readonly expanded = signal(false);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     await this.reload();
@@ -78,21 +185,72 @@ export class ProjectComponent implements OnInit {
   }
 
   protected async reload(): Promise<void> {
+    const readSlugs = new Set(
+      (await this.db.listCachedLessons(this.id())).filter((l) => l.readAt).map((l) => l.slug),
+    );
     try {
       const project = await this.api.getProject(this.id());
-      this.lessons.set(project.lessons);
+      this.lessons.set(
+        project.lessons.map((l) => ({
+          slug: l.slug,
+          seq: l.seq,
+          title: l.title,
+          state: lessonState(readSlugs.has(l.slug), l.createdAt),
+        })),
+      );
       this.title.set(titleFromMission(project.mission));
       await this.db.cacheLessonSummaries(this.id(), project.lessons);
     } catch {
       // Offline: render the cached lesson index so lessons remain reachable.
+      // Without the server's createdAt we can only distinguish read from unread.
       const cached = await this.db.listCachedLessons(this.id());
-      if (cached.length > 0) this.lessons.set(cached);
+      if (cached.length > 0) {
+        this.lessons.set(
+          cached.map((l) => ({
+            slug: l.slug,
+            seq: l.seq,
+            title: l.title,
+            state: l.readAt ? 'read' : 'unread',
+          })),
+        );
+      }
     }
+  }
+
+  protected async remove(): Promise<void> {
+    if (this.deleting()) return;
+    if (!confirm(`Delete "${this.title()}" and all its lessons? This can't be undone.`)) return;
+    this.deleting.set(true);
+    try {
+      await this.api.deleteProject(this.id());
+      await this.db.removeCachedProject(this.id());
+      await this.router.navigate(['/library']);
+    } catch (err) {
+      this.deleteError.set(err instanceof Error ? err.message : 'Could not delete the project.');
+      this.deleting.set(false);
+    }
+  }
+
+  // The lesson number chip carries read state: teal once studied, indigo when
+  // freshly generated and unopened, quiet otherwise.
+  protected chipStyle(lesson: LessonRow): string {
+    if (lesson.state === 'read') return 'background:var(--accent-2-soft);color:var(--accent-2)';
+    if (lesson.state === 'new') return 'background:var(--accent-soft);color:var(--accent)';
+    return 'background:var(--chip);color:var(--faint)';
   }
 
   protected pad(seq: number): string {
     return seq.toString().padStart(2, '0');
   }
+}
+
+// A lesson is "new" while it's freshly generated and still unopened; after two
+// days the novelty lapses and an unread lesson is simply unread.
+const NEW_WINDOW_MS = 48 * 60 * 60 * 1000;
+function lessonState(read: boolean, createdAt: string): LessonState {
+  if (read) return 'read';
+  if (Date.now() - new Date(createdAt).getTime() < NEW_WINDOW_MS) return 'new';
+  return 'unread';
 }
 
 function titleFromMission(mission: string): string {

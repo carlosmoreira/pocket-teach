@@ -4,7 +4,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideGraduationCap,
   lucidePlus,
-  lucideSettings,
+  lucideTrash2,
   lucideTriangleAlert,
 } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
@@ -15,36 +15,35 @@ import type { CachedProject } from '../../data/models';
   selector: 'app-library',
   imports: [RouterLink, NgIcon],
   viewProviders: [
-    provideIcons({ lucideSettings, lucidePlus, lucideGraduationCap, lucideTriangleAlert }),
+    provideIcons({ lucidePlus, lucideGraduationCap, lucideTriangleAlert, lucideTrash2 }),
   ],
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
       <div class="w-full max-w-lg flex flex-col gap-5 pb-24">
         <header class="flex items-center gap-3">
-          <h1 class="text-lg font-bold tracking-tight flex-1" style="color:var(--ink)">
+          <span
+            class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0"
+            style="background:var(--accent);font-family:var(--serif);font-weight:700;font-size:20px"
+            >P</span
+          >
+          <h1
+            class="flex-1 text-2xl"
+            style="color:var(--ink);font-family:var(--serif);font-weight:600;letter-spacing:-0.01em"
+          >
             Pocket Teach
           </h1>
-          <a
-            routerLink="/settings"
-            class="grid place-items-center w-9 h-9 rounded-xl"
-            style="background:var(--panel);border:1px solid var(--line);color:var(--ink)"
-            aria-label="Settings"
-          >
-            <ng-icon name="lucideSettings" size="18" />
-          </a>
         </header>
 
         @if (!loaded()) {
           <p class="text-sm" style="color:var(--muted)">Loading…</p>
         } @else if (error()) {
-          <a
-            routerLink="/settings"
+          <p
             class="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm"
             style="background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)"
           >
             <ng-icon name="lucideTriangleAlert" size="16" />
             {{ error() }}
-          </a>
+          </p>
         } @else if (projects().length === 0) {
           <section
             class="rounded-2xl p-8 flex flex-col items-center text-center gap-3"
@@ -56,7 +55,9 @@ import type { CachedProject } from '../../data/models';
             >
               <ng-icon name="lucideGraduationCap" size="26" />
             </span>
-            <h2 class="text-base font-bold" style="color:var(--ink)">No learning projects yet</h2>
+            <h2 style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:19px">
+              No learning projects yet
+            </h2>
             <p class="text-sm" style="color:var(--muted)">
               Start one and meet your teacher — it will build you grounded, self-contained lessons.
             </p>
@@ -73,18 +74,37 @@ import type { CachedProject } from '../../data/models';
         } @else {
           <section class="flex flex-col gap-3">
             @for (project of projects(); track project.id) {
-              <a
-                [routerLink]="['/project', project.id]"
-                class="rounded-2xl p-4 flex flex-col gap-1"
+              <div
+                class="rounded-2xl p-4 flex items-center gap-2"
                 style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
               >
-                <h3 class="text-sm font-bold" style="color:var(--ink)">{{ project.title }}</h3>
-                <span class="mt-1 text-xs font-semibold" style="color:var(--accent-2)">
-                  {{ project.lessonCount }}
-                  {{ project.lessonCount === 1 ? 'lesson' : 'lessons' }} ·
-                  {{ updatedLabel(project.updatedAt) }}
-                </span>
-              </a>
+                <a
+                  [routerLink]="['/project', project.id]"
+                  class="flex-1 flex flex-col gap-1 min-w-0"
+                >
+                  <h3
+                    class="truncate"
+                    style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:16px;letter-spacing:-0.005em"
+                  >
+                    {{ project.title }}
+                  </h3>
+                  <span class="mt-1.5 font-mono-label" style="color:var(--muted);font-size:11px">
+                    {{ pad2(project.lessonCount) }}
+                    {{ project.lessonCount === 1 ? 'lesson' : 'lessons' }} ·
+                    {{ updatedLabel(project.updatedAt) }}
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  (click)="remove(project)"
+                  [disabled]="deleting() === project.id"
+                  class="grid place-items-center w-9 h-9 rounded-xl shrink-0 disabled:opacity-40"
+                  style="color:var(--muted)"
+                  aria-label="Delete project"
+                >
+                  <ng-icon name="lucideTrash2" size="18" />
+                </button>
+              </div>
             }
           </section>
         }
@@ -113,6 +133,7 @@ export class LibraryComponent implements OnInit {
   protected readonly projects = signal<CachedProject[]>([]);
   protected readonly loaded = signal(false);
   protected readonly creating = signal(false);
+  protected readonly deleting = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
@@ -141,6 +162,25 @@ export class LibraryComponent implements OnInit {
       this.error.set(err instanceof Error ? err.message : 'Could not create a project.');
       this.creating.set(false);
     }
+  }
+
+  protected async remove(project: CachedProject): Promise<void> {
+    if (this.deleting()) return;
+    if (!confirm(`Delete "${project.title}" and all its lessons? This can't be undone.`)) return;
+    this.deleting.set(project.id);
+    try {
+      await this.api.deleteProject(project.id);
+      await this.db.removeCachedProject(project.id);
+      this.projects.update((list) => list.filter((p) => p.id !== project.id));
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not delete the project.');
+    } finally {
+      this.deleting.set(null);
+    }
+  }
+
+  protected pad2(n: number): string {
+    return String(n).padStart(2, '0');
   }
 
   protected updatedLabel(iso: string): string {

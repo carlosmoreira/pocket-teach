@@ -44,17 +44,32 @@ export interface Proposal {
   confirmed?: boolean;
 }
 
+export interface CreatedLessonRef {
+  slug: string;
+  title: string;
+}
+
 export interface StoredMessage {
   role: 'user' | 'assistant';
   content: string;
   proposal?: Proposal;
+  // Set on the assistant turn that announces a finished lesson, so the "lesson
+  // ready" card survives a reload.
+  lesson?: CreatedLessonRef;
   at: string;
 }
 
 export type GenerationPhase = 'planning' | 'researching' | 'writing' | 'done' | 'error';
 
+// A single step the Teacher took while building the lesson, surfaced live so the
+// wait is a legible activity feed rather than an opaque spinner. `search` carries
+// the query; `read` carries the source it opened.
+export type GenerationActivityKind = 'search' | 'read';
+
 export type GenerationEvent =
   | { type: 'phase'; phase: GenerationPhase }
+  | { type: 'activity'; kind: GenerationActivityKind; detail: string }
+  | { type: 'progress'; chars: number }
   | { type: 'lesson'; lesson: LessonSummary }
   | { type: 'done' }
   | { type: 'error'; message: string };

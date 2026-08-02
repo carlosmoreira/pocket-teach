@@ -12,13 +12,12 @@ async function bootstrap(): Promise<void> {
   );
 
   // Reflect any origin: the private network is the trust boundary, not CORS.
-  app.enableCors({ origin: true });
+  // Fastify's default preflight only advertises GET/HEAD/POST, so DELETE (and
+  // PUT/PATCH) are named explicitly or the browser blocks those requests.
+  app.enableCors({ origin: true, methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] });
 
   const config = app.get(AppConfigService);
   const logger = new Logger('Bootstrap');
-  if (config.gatewayToken === 'dev-token') {
-    logger.warn('GATEWAY_TOKEN is the default "dev-token" — set a real token outside local dev.');
-  }
 
   await app.listen(config.port, '0.0.0.0');
   logger.log(`Backend listening on :${config.port} (provider=${config.provider})`);

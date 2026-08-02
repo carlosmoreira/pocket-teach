@@ -1,16 +1,14 @@
 import { Injectable } from '@angular/core';
 import Dexie, { type Table } from 'dexie';
-import { type CachedLesson, type CachedProject, type Settings, SETTINGS_KEY } from './models';
+import type { CachedLesson, CachedProject } from './models';
 import type { LessonSummary } from '../api/contracts';
 
-// A new database name so the old client-owned workspace (projects, messages,
-// records) is dropped — the backend is the source of truth now. This store is
-// an offline replica: the project index and lessons, plus settings.
+// The backend is the source of truth; this store is an offline replica of the
+// project index and lessons so lessons read without the backend.
 @Injectable({ providedIn: 'root' })
 export class DbService extends Dexie {
   readonly projects!: Table<CachedProject, string>;
   readonly lessons!: Table<CachedLesson, string>;
-  readonly settings!: Table<Settings, string>;
 
   constructor() {
     super('pocket-teach-v2');
@@ -20,14 +18,13 @@ export class DbService extends Dexie {
       lessons: 'key, projectId',
       settings: 'id',
     });
-  }
-
-  async loadSettings(): Promise<Settings | undefined> {
-    return this.settings.get(SETTINGS_KEY);
-  }
-
-  async saveSettings(settings: Omit<Settings, 'id'>): Promise<void> {
-    await this.settings.put({ ...settings, id: SETTINGS_KEY });
+    // Backend URL is a build-time env var now and there's no token — drop the
+    // settings store.
+    this.version(3).stores({
+      projects: 'id, updatedAt',
+      lessons: 'key, projectId',
+      settings: null,
+    });
   }
 
   async cacheProjects(projects: CachedProject[]): Promise<void> {
@@ -54,6 +51,7 @@ export class DbService extends Dexie {
         title: s.title,
         recap: s.recap,
         html: existing?.html,
+        readAt: existing?.readAt,
         cachedAt: existing?.cachedAt ?? new Date().toISOString(),
       });
     }
@@ -67,11 +65,23 @@ export class DbService extends Dexie {
     recap: string;
     html: string;
   }): Promise<void> {
+    const key = `${lesson.projectId}/${lesson.slug}`;
+    const existing = await this.lessons.get(key);
     await this.lessons.put({
       ...lesson,
-      key: `${lesson.projectId}/${lesson.slug}`,
+      key,
+      readAt: existing?.readAt,
       cachedAt: new Date().toISOString(),
     });
+  }
+
+  // Record that this lesson has been opened, so the project view can show its
+  // read state. Merges onto whatever row exists (or seeds a minimal one).
+  async markRead(projectId: string, slug: string): Promise<void> {
+    const key = `${projectId}/${slug}`;
+    const existing = await this.lessons.get(key);
+    if (existing?.readAt) return;
+    await this.lessons.update(key, { readAt: new Date().toISOString() });
   }
 
   async listCachedLessons(projectId: string): Promise<CachedLesson[]> {
@@ -81,5 +91,12 @@ export class DbService extends Dexie {
 
   async getCachedLesson(projectId: string, slug: string): Promise<CachedLesson | undefined> {
     return this.lessons.get(`${projectId}/${slug}`);
+  }
+
+  async removeCachedProject(id: string): Promise<void> {
+    await this.transaction('rw', this.projects, this.lessons, async () => {
+      await this.projects.delete(id);
+      await this.lessons.where('projectId').equals(id).delete();
+    });
   }
 }

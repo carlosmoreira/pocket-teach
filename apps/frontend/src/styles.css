@@ -3,81 +3,114 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ── Pocket Teach design tokens — mirrors design.html ── */
+/* ── Pocket Teach design tokens — "Editorial × Crisp" ──
+   Warm paper reading surfaces with crisp panels; an editorial serif for display,
+   monospace for anything a machine counts, and the app's indigo/teal carried
+   forward. See the design direction artifact for the rationale. */
 @theme {
-  --color-bg: #f6f7fb;
-  --color-panel: #ffffff;
-  --color-ink: #1a1d29;
-  --color-muted: #5b6172;
-  --color-line: #e5e8f0;
-  --color-accent: #5b5bd6;
-  --color-accent-2: #12a594;
-  --color-warn: #d9480f;
-  --color-chip: #eef0fb;
+  --color-bg: #f4f2ec;
+  --color-panel: #fbfaf6;
+  --color-ink: #1f1b2e;
+  --color-muted: #6c6678;
+  --color-line: #e5e0d5;
+  --color-accent: #4b45c7;
+  --color-accent-2: #0f8f83;
+  --color-warn: #c0442a;
+  --color-chip: #ece8df;
 
-  --radius-card: 16px;
+  --radius-card: 14px;
   --radius-field: 11px;
+
+  --font-serif: 'Charter', 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
 }
 
 :root {
-  --bg: #f6f7fb;
-  --panel: #ffffff;
-  --ink: #1a1d29;
-  --muted: #5b6172;
-  --line: #e5e8f0;
-  --accent: #5b5bd6;
-  --accent-2: #12a594;
-  --warn: #d9480f;
-  --chip: #eef0fb;
-  --ok: #12a594;
-  --shadow: 0 10px 30px rgba(30, 34, 60, 0.1);
+  --serif: 'Charter', 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
+}
+
+:root {
+  --bg: #f4f2ec;
+  --panel: #fbfaf6;
+  --panel-2: #f0ede4;
+  --ink: #1f1b2e;
+  --muted: #6c6678;
+  --faint: #938d9e;
+  --line: #e5e0d5;
+  --hair: #ddd7ca;
+  --accent: #4b45c7;
+  --accent-soft: #ece9fb;
+  --accent-2: #0f8f83;
+  --accent-2-soft: #dcefec;
+  --warn: #c0442a;
+  --chip: #ece8df;
+  --ok: #0f8f83;
+  --shadow: 0 1px 2px rgba(31, 27, 46, 0.05), 0 10px 30px rgba(31, 27, 46, 0.06);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d0f16;
-    --panel: #151824;
-    --ink: #e9ecf5;
-    --muted: #9aa1b8;
-    --line: #242838;
-    --accent: #8b8bff;
+    --bg: #15131c;
+    --panel: #1e1b28;
+    --panel-2: #262232;
+    --ink: #efece4;
+    --muted: #9a95a8;
+    --faint: #6f6a7d;
+    --line: #2c2838;
+    --hair: #322d40;
+    --accent: #8b86f5;
+    --accent-soft: #262052;
     --accent-2: #2dd4bf;
-    --warn: #ff8a5c;
-    --chip: #1c2030;
+    --accent-2-soft: #123a37;
+    --warn: #f0794f;
+    --chip: #272332;
     --ok: #2dd4bf;
-    --shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.4);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='light'] {
-  --bg: #f6f7fb;
-  --panel: #ffffff;
-  --ink: #1a1d29;
-  --muted: #5b6172;
-  --line: #e5e8f0;
-  --accent: #5b5bd6;
-  --accent-2: #12a594;
-  --warn: #d9480f;
-  --chip: #eef0fb;
-  --ok: #12a594;
-  --shadow: 0 10px 30px rgba(30, 34, 60, 0.1);
+  --bg: #f4f2ec;
+  --panel: #fbfaf6;
+  --panel-2: #f0ede4;
+  --ink: #1f1b2e;
+  --muted: #6c6678;
+  --faint: #938d9e;
+  --line: #e5e0d5;
+  --hair: #ddd7ca;
+  --accent: #4b45c7;
+  --accent-soft: #ece9fb;
+  --accent-2: #0f8f83;
+  --accent-2-soft: #dcefec;
+  --warn: #c0442a;
+  --chip: #ece8df;
+  --ok: #0f8f83;
+  --shadow: 0 1px 2px rgba(31, 27, 46, 0.05), 0 10px 30px rgba(31, 27, 46, 0.06);
   color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-  --bg: #0d0f16;
-  --panel: #151824;
-  --ink: #e9ecf5;
-  --muted: #9aa1b8;
-  --line: #242838;
-  --accent: #8b8bff;
+  --bg: #15131c;
+  --panel: #1e1b28;
+  --panel-2: #262232;
+  --ink: #efece4;
+  --muted: #9a95a8;
+  --faint: #6f6a7d;
+  --line: #2c2838;
+  --hair: #322d40;
+  --accent: #8b86f5;
+  --accent-soft: #262052;
   --accent-2: #2dd4bf;
-  --warn: #ff8a5c;
-  --chip: #1c2030;
+  --accent-2-soft: #123a37;
+  --warn: #f0794f;
+  --chip: #272332;
   --ok: #2dd4bf;
-  --shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.4);
   color-scheme: dark;
 }
 
@@ -95,13 +128,51 @@
   animation: pt-step-pulse 1.1s infinite;
 }
 
+/* The lesson-ready card's arrival: a gentle rise + settle, fired once when a
+   lesson finishes (not on transcript reload). */
+@keyframes pt-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(7px) scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.012);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.pt-arrive {
+  animation: pt-arrive 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-step-pulse,
+  .pt-arrive {
+    animation: none !important;
+  }
+}
+
+/* Editorial helpers used across components. */
+.font-serif-display {
+  font-family: var(--serif);
+  letter-spacing: -0.01em;
+}
+.font-mono-label {
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 html,
 body {
   margin: 0;
   min-height: 100dvh;
   background-color: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--sans);
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;

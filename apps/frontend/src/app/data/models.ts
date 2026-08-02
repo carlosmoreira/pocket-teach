@@ -1,5 +1,5 @@
 // The backend owns the workspace; the device keeps an offline replica of the
-// project index and lessons (so lessons read without the backend) plus settings.
+// project index and lessons (so lessons read without the backend).
 
 export interface CachedProject {
   id: string;
@@ -16,17 +16,6 @@ export interface CachedLesson {
   title: string;
   recap: string;
   html?: string; // filled once the lesson has been opened/generated on this device
+  readAt?: string; // set the first time the lesson is opened on this device
   cachedAt: string;
-}
-
-export const SETTINGS_KEY = 'app';
-
-export type LlmProvider = 'claude';
-
-export interface Settings {
-  id: string;
-  baseUrl: string;
-  bearerToken: string;
-  provider?: LlmProvider;
-  theme?: 'light' | 'dark' | 'system';
 }

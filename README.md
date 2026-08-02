@@ -39,7 +39,7 @@ pnpm install                        # from the repo root
 
 # API
 cp apps/api/.env.example apps/api/.env   # set ANTHROPIC_API_KEY for real generation
-pnpm --filter api dev                    # watch mode (tsx) → http://localhost:8787
+pnpm --filter api dev                    # watch mode (tsx) → http://localhost:1212
 
 # Frontend
 pnpm --filter frontend dev               # → http://localhost:4200 (point Settings at the API)
@@ -75,7 +75,7 @@ Multi-stage build on `node:22-alpine`, runs non-root, with a `curl /health`
 
 | Var                 | Default           | Purpose                                |
 | ------------------- | ----------------- | -------------------------------------- |
-| `PORT`              | `8787`            | Listen port                            |
+| `PORT`              | `1212`            | Listen port                            |
 | `GATEWAY_TOKEN`     | `dev-token`       | Single static bearer token             |
 | `PROVIDER`          | `claude`          | Active LLM provider (v1: claude)       |
 | `PLANNER_MODEL`     | `claude-sonnet-5` | Planner model                          |

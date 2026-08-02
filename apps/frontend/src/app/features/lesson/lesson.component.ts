@@ -1,6 +1,6 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowLeft } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
@@ -14,7 +14,7 @@ import { DbService } from '../../data/db.service';
     <main class="h-dvh w-full flex flex-col" style="background:var(--bg)">
       <header
         class="flex items-center gap-3 px-4 py-3 shrink-0"
-        style="background:var(--panel);border-bottom:1px solid var(--line)"
+        style="background:var(--panel);border-bottom:1px solid var(--hair)"
       >
         <a
           [routerLink]="['/project', projectId()]"
@@ -24,15 +24,21 @@ import { DbService } from '../../data/db.service';
         >
           <ng-icon name="lucideArrowLeft" size="18" />
         </a>
-        <h1 class="text-sm font-bold tracking-tight truncate" style="color:var(--ink)">
+        <span class="font-mono-label shrink-0" style="color:var(--accent);font-size:11px">{{
+          seqLabel()
+        }}</span>
+        <h1
+          class="truncate"
+          style="color:var(--muted);font-family:var(--serif);font-weight:600;font-size:15px"
+        >
           {{ title() }}
         </h1>
       </header>
 
-      @if (srcdoc(); as html) {
+      @if (src(); as url) {
         <iframe
           class="flex-1 w-full border-0"
-          [srcdoc]="html"
+          [src]="url"
           sandbox="allow-scripts"
           title="Lesson"
         ></iframe>
@@ -40,11 +46,13 @@ import { DbService } from '../../data/db.service';
         <p class="p-4 text-sm" style="color:var(--muted)">
           {{ error() ?? 'Lesson not found.' }}
         </p>
+      } @else {
+        <p class="p-4 text-sm" style="color:var(--muted)">Loading…</p>
       }
     </main>
   `,
 })
-export class LessonComponent implements OnInit {
+export class LessonComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
   private readonly sanitizer = inject(DomSanitizer);
@@ -53,9 +61,19 @@ export class LessonComponent implements OnInit {
   readonly slug = input.required<string>();
 
   protected readonly title = signal('Lesson');
-  protected readonly srcdoc = signal<SafeHtml | null>(null);
+  protected readonly src = signal<SafeResourceUrl | null>(null);
   protected readonly loaded = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  private objectUrl: string | null = null;
+
+  // The slug is prefixed with the zero-padded lesson number (e.g. "0005-…"); the
+  // reader surfaces it as a running "▸ 05" so the lesson's place in the course is
+  // always visible above the Tufte body.
+  protected seqLabel(): string {
+    const match = /^(\d+)/.exec(this.slug());
+    return match ? `▸ ${match[1].replace(/^0+(?=\d)/, '').padStart(2, '0')}` : '▸';
+  }
 
   async ngOnInit(): Promise<void> {
     // Offline replica first, so a saved lesson reads without the backend.
@@ -79,15 +97,35 @@ export class LessonComponent implements OnInit {
       });
     } catch (err) {
       // Only an error if we have nothing rendered (no cached html and offline).
-      if (!this.srcdoc()) {
+      if (!this.src()) {
         this.error.set(err instanceof Error ? err.message : 'Could not load the lesson.');
       }
     } finally {
       this.loaded.set(true);
     }
+
+    // Once something actually rendered, remember it's been read so the project
+    // view can reflect progress.
+    if (this.src()) void this.db.markRead(this.projectId(), this.slug());
   }
 
+  ngOnDestroy(): void {
+    this.revoke();
+  }
+
+  // Load the lesson as a real document via a blob URL rather than a giant inline
+  // srcdoc attribute — more robust across browsers for large HTML.
   private render(html: string): void {
-    this.srcdoc.set(this.sanitizer.bypassSecurityTrustHtml(html));
+    this.revoke();
+    const blob = new Blob([html], { type: 'text/html' });
+    this.objectUrl = URL.createObjectURL(blob);
+    this.src.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.objectUrl));
+  }
+
+  private revoke(): void {
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = null;
+    }
   }
 }
