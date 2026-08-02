@@ -16,5 +16,6 @@ export interface CachedLesson {
   title: string;
   recap: string;
   html?: string; // filled once the lesson has been opened/generated on this device
+  readAt?: string; // set the first time the lesson is opened on this device
   cachedAt: string;
 }

@@ -41,6 +41,9 @@ interface ChatMsg {
   content: string;
   proposal?: Proposal;
   lesson?: CreatedLesson;
+  // True only for a lesson card appended live on completion, so the arrival
+  // animation plays once and not on every transcript reload.
+  justArrived?: boolean;
 }
 
 type FeedIcon = 'search' | 'read' | 'write';
@@ -153,6 +156,7 @@ const FEED_ICONS: Record<FeedIcon, string> = {
           @if (message.lesson; as lesson) {
             <a
               [routerLink]="['/lesson', projectId(), lesson.slug]"
+              [class.pt-arrive]="message.justArrived"
               class="self-start w-full rounded-2xl p-3.5 flex items-center gap-3"
               style="background:var(--panel);border:1px solid var(--accent-2);box-shadow:var(--shadow)"
             >
@@ -524,6 +528,7 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
                 'Done — your new lesson is ready.',
                 undefined,
                 created,
+                true,
               );
             }
             return;
@@ -590,8 +595,16 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     content: string,
     proposal?: Proposal,
     lesson?: CreatedLesson,
+    justArrived = false,
   ): ChatMsg {
-    const message: ChatMsg = { id: crypto.randomUUID(), role, content, proposal, lesson };
+    const message: ChatMsg = {
+      id: crypto.randomUUID(),
+      role,
+      content,
+      proposal,
+      lesson,
+      justArrived,
+    };
     this.messages.update((list) => [...list, message]);
     return message;
   }

@@ -128,6 +128,33 @@
   animation: pt-step-pulse 1.1s infinite;
 }
 
+/* The lesson-ready card's arrival: a gentle rise + settle, fired once when a
+   lesson finishes (not on transcript reload). */
+@keyframes pt-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(7px) scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.012);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.pt-arrive {
+  animation: pt-arrive 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-step-pulse,
+  .pt-arrive {
+    animation: none !important;
+  }
+}
+
 /* Editorial helpers used across components. */
 .font-serif-display {
   font-family: var(--serif);

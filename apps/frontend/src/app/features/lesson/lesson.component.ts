@@ -103,6 +103,10 @@ export class LessonComponent implements OnInit, OnDestroy {
     } finally {
       this.loaded.set(true);
     }
+
+    // Once something actually rendered, remember it's been read so the project
+    // view can reflect progress.
+    if (this.src()) void this.db.markRead(this.projectId(), this.slug());
   }
 
   ngOnDestroy(): void {

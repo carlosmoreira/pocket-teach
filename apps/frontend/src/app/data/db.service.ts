@@ -51,6 +51,7 @@ export class DbService extends Dexie {
         title: s.title,
         recap: s.recap,
         html: existing?.html,
+        readAt: existing?.readAt,
         cachedAt: existing?.cachedAt ?? new Date().toISOString(),
       });
     }
@@ -64,11 +65,23 @@ export class DbService extends Dexie {
     recap: string;
     html: string;
   }): Promise<void> {
+    const key = `${lesson.projectId}/${lesson.slug}`;
+    const existing = await this.lessons.get(key);
     await this.lessons.put({
       ...lesson,
-      key: `${lesson.projectId}/${lesson.slug}`,
+      key,
+      readAt: existing?.readAt,
       cachedAt: new Date().toISOString(),
     });
+  }
+
+  // Record that this lesson has been opened, so the project view can show its
+  // read state. Merges onto whatever row exists (or seeds a minimal one).
+  async markRead(projectId: string, slug: string): Promise<void> {
+    const key = `${projectId}/${slug}`;
+    const existing = await this.lessons.get(key);
+    if (existing?.readAt) return;
+    await this.lessons.update(key, { readAt: new Date().toISOString() });
   }
 
   async listCachedLessons(projectId: string): Promise<CachedLesson[]> {

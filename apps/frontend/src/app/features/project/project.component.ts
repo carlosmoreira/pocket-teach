@@ -6,10 +6,13 @@ import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
 import { TeacherChatComponent } from './teacher-chat.component';
 
+type LessonState = 'read' | 'new' | 'unread';
+
 interface LessonRow {
   slug: string;
   seq: number;
   title: string;
+  state: LessonState;
 }
 
 @Component({
@@ -97,7 +100,7 @@ interface LessonRow {
                     >
                       <span
                         class="grid place-items-center w-7 h-7 rounded-lg text-xs shrink-0 font-mono-label"
-                        style="background:var(--chip);color:var(--accent)"
+                        [style]="chipStyle(lesson)"
                       >
                         {{ pad(lesson.seq) }}
                       </span>
@@ -137,7 +140,7 @@ interface LessonRow {
                   >
                     <span
                       class="grid place-items-center w-7 h-7 rounded-lg text-xs shrink-0 font-mono-label"
-                      style="background:var(--chip);color:var(--accent)"
+                      [style]="chipStyle(lesson)"
                     >
                       {{ pad(lesson.seq) }}
                     </span>
@@ -182,15 +185,35 @@ export class ProjectComponent implements OnInit {
   }
 
   protected async reload(): Promise<void> {
+    const readSlugs = new Set(
+      (await this.db.listCachedLessons(this.id())).filter((l) => l.readAt).map((l) => l.slug),
+    );
     try {
       const project = await this.api.getProject(this.id());
-      this.lessons.set(project.lessons);
+      this.lessons.set(
+        project.lessons.map((l) => ({
+          slug: l.slug,
+          seq: l.seq,
+          title: l.title,
+          state: lessonState(readSlugs.has(l.slug), l.createdAt),
+        })),
+      );
       this.title.set(titleFromMission(project.mission));
       await this.db.cacheLessonSummaries(this.id(), project.lessons);
     } catch {
       // Offline: render the cached lesson index so lessons remain reachable.
+      // Without the server's createdAt we can only distinguish read from unread.
       const cached = await this.db.listCachedLessons(this.id());
-      if (cached.length > 0) this.lessons.set(cached);
+      if (cached.length > 0) {
+        this.lessons.set(
+          cached.map((l) => ({
+            slug: l.slug,
+            seq: l.seq,
+            title: l.title,
+            state: l.readAt ? 'read' : 'unread',
+          })),
+        );
+      }
     }
   }
 
@@ -208,9 +231,26 @@ export class ProjectComponent implements OnInit {
     }
   }
 
+  // The lesson number chip carries read state: teal once studied, indigo when
+  // freshly generated and unopened, quiet otherwise.
+  protected chipStyle(lesson: LessonRow): string {
+    if (lesson.state === 'read') return 'background:var(--accent-2-soft);color:var(--accent-2)';
+    if (lesson.state === 'new') return 'background:var(--accent-soft);color:var(--accent)';
+    return 'background:var(--chip);color:var(--faint)';
+  }
+
   protected pad(seq: number): string {
     return seq.toString().padStart(2, '0');
   }
+}
+
+// A lesson is "new" while it's freshly generated and still unopened; after two
+// days the novelty lapses and an unread lesson is simply unread.
+const NEW_WINDOW_MS = 48 * 60 * 60 * 1000;
+function lessonState(read: boolean, createdAt: string): LessonState {
+  if (read) return 'read';
+  if (Date.now() - new Date(createdAt).getTime() < NEW_WINDOW_MS) return 'new';
+  return 'unread';
 }
 
 function titleFromMission(mission: string): string {
