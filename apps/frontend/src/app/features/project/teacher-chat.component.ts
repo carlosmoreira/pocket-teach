@@ -28,6 +28,7 @@ import {
 } from '@ng-icons/lucide';
 import { ApiService } from '../../api/api.service';
 import { DbService } from '../../data/db.service';
+import { NotificationService } from '../../data/notification.service';
 import type { GenerationPhase, Proposal } from '../../api/contracts';
 
 interface CreatedLesson {
@@ -332,6 +333,7 @@ const FEED_ICONS: Record<FeedIcon, string> = {
 export class TeacherChatComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly db = inject(DbService);
+  private readonly notifications = inject(NotificationService);
   private readonly abort = new AbortController();
 
   readonly projectId = input.required<string>();
@@ -478,6 +480,8 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
 
   protected async createLesson(message: ChatMsg): Promise<void> {
     if (!message.proposal) return;
+    // Ask to notify now, while they've just acted and are about to wait.
+    void this.notifications.ensurePermission();
     this.genRequestObjective = message.proposal.objective;
     this.generatingFor.set(message.id);
     await this.runLessonGeneration(message);
@@ -530,6 +534,7 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
                 created,
                 true,
               );
+              this.notifications.lessonReady(created.title);
             }
             return;
           case 'error':
