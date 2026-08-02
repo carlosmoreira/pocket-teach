@@ -30,7 +30,10 @@ interface LessonRow {
           >
             <ng-icon name="lucideArrowLeft" size="18" />
           </a>
-          <h1 class="text-lg font-bold tracking-tight truncate flex-1" style="color:var(--ink)">
+          <h1
+            class="truncate flex-1 text-xl"
+            style="color:var(--ink);font-family:var(--serif);font-weight:600;letter-spacing:-0.01em"
+          >
             {{ title() }}
           </h1>
           <button
@@ -68,8 +71,12 @@ interface LessonRow {
                 style="color:var(--ink)"
               >
                 <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
-                <span class="flex-1 text-left">
-                  {{ lessons().length }} {{ lessons().length === 1 ? 'lesson' : 'lessons' }}
+                <span
+                  class="flex-1 text-left font-mono-label"
+                  style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint)"
+                >
+                  {{ pad(lessons().length) }}
+                  {{ lessons().length === 1 ? 'lesson' : 'lessons' }}
                 </span>
                 <ng-icon
                   name="lucideChevronDown"
@@ -89,14 +96,16 @@ interface LessonRow {
                       class="flex items-center gap-3 px-2 py-2.5 rounded-xl"
                     >
                       <span
-                        class="grid place-items-center w-7 h-7 rounded-lg text-xs font-bold shrink-0"
+                        class="grid place-items-center w-7 h-7 rounded-lg text-xs shrink-0 font-mono-label"
                         style="background:var(--chip);color:var(--accent)"
                       >
                         {{ pad(lesson.seq) }}
                       </span>
-                      <span class="text-sm font-semibold" style="color:var(--ink)">{{
-                        lesson.title
-                      }}</span>
+                      <span
+                        class="truncate"
+                        style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14px"
+                        >{{ lesson.title }}</span
+                      >
                     </a>
                   }
                 </div>
@@ -108,13 +117,13 @@ interface LessonRow {
               class="hidden lg:flex lg:flex-col lg:w-72 lg:shrink-0 rounded-2xl overflow-hidden"
               style="background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)"
             >
-              <div
-                class="flex items-center gap-2 px-3.5 py-3 text-sm font-semibold"
-                style="color:var(--ink)"
-              >
+              <div class="flex items-center gap-2 px-3.5 py-3" style="color:var(--ink)">
                 <ng-icon name="lucideBookOpen" size="16" style="color:var(--accent)" />
                 <span
-                  >{{ lessons().length }} {{ lessons().length === 1 ? 'lesson' : 'lessons' }}</span
+                  class="font-mono-label"
+                  style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint)"
+                  >{{ pad(lessons().length) }}
+                  {{ lessons().length === 1 ? 'lesson' : 'lessons' }}</span
                 >
               </div>
               <div
@@ -127,14 +136,16 @@ interface LessonRow {
                     class="flex items-center gap-3 px-2 py-2.5 rounded-xl"
                   >
                     <span
-                      class="grid place-items-center w-7 h-7 rounded-lg text-xs font-bold shrink-0"
+                      class="grid place-items-center w-7 h-7 rounded-lg text-xs shrink-0 font-mono-label"
                       style="background:var(--chip);color:var(--accent)"
                     >
                       {{ pad(lesson.seq) }}
                     </span>
-                    <span class="text-sm font-semibold" style="color:var(--ink)">{{
-                      lesson.title
-                    }}</span>
+                    <span
+                      class="truncate"
+                      style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14px"
+                      >{{ lesson.title }}</span
+                    >
                   </a>
                 }
               </div>

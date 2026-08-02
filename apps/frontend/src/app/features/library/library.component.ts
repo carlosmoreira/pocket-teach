@@ -21,7 +21,15 @@ import type { CachedProject } from '../../data/models';
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
       <div class="w-full max-w-lg flex flex-col gap-5 pb-24">
         <header class="flex items-center gap-3">
-          <h1 class="text-lg font-bold tracking-tight flex-1" style="color:var(--ink)">
+          <span
+            class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0"
+            style="background:var(--accent);font-family:var(--serif);font-weight:700;font-size:20px"
+            >P</span
+          >
+          <h1
+            class="flex-1 text-2xl"
+            style="color:var(--ink);font-family:var(--serif);font-weight:600;letter-spacing:-0.01em"
+          >
             Pocket Teach
           </h1>
         </header>
@@ -47,7 +55,9 @@ import type { CachedProject } from '../../data/models';
             >
               <ng-icon name="lucideGraduationCap" size="26" />
             </span>
-            <h2 class="text-base font-bold" style="color:var(--ink)">No learning projects yet</h2>
+            <h2 style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:19px">
+              No learning projects yet
+            </h2>
             <p class="text-sm" style="color:var(--muted)">
               Start one and meet your teacher — it will build you grounded, self-contained lessons.
             </p>
@@ -72,11 +82,14 @@ import type { CachedProject } from '../../data/models';
                   [routerLink]="['/project', project.id]"
                   class="flex-1 flex flex-col gap-1 min-w-0"
                 >
-                  <h3 class="text-sm font-bold truncate" style="color:var(--ink)">
+                  <h3
+                    class="truncate"
+                    style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:16px;letter-spacing:-0.005em"
+                  >
                     {{ project.title }}
                   </h3>
-                  <span class="mt-1 text-xs font-semibold" style="color:var(--accent-2)">
-                    {{ project.lessonCount }}
+                  <span class="mt-1.5 font-mono-label" style="color:var(--muted);font-size:11px">
+                    {{ pad2(project.lessonCount) }}
                     {{ project.lessonCount === 1 ? 'lesson' : 'lessons' }} ·
                     {{ updatedLabel(project.updatedAt) }}
                   </span>
@@ -164,6 +177,10 @@ export class LibraryComponent implements OnInit {
     } finally {
       this.deleting.set(null);
     }
+  }
+
+  protected pad2(n: number): string {
+    return String(n).padStart(2, '0');
   }
 
   protected updatedLabel(iso: string): string {

@@ -75,7 +75,25 @@ const FEED_ICONS: Record<FeedIcon, string> = {
   ],
   template: `
     <section class="flex flex-col gap-3">
-      <h2 class="text-sm font-bold" style="color:var(--ink)">Teacher</h2>
+      <div class="flex items-center gap-2.5">
+        <span
+          class="grid place-items-center w-9 h-9 rounded-full shrink-0 text-white"
+          style="background:radial-gradient(120% 120% at 30% 25%, var(--accent) 0%, #6f69e0 55%, var(--accent-2) 130%);font-family:var(--serif);font-weight:700;font-size:16px;box-shadow:0 0 0 3px var(--accent-soft)"
+          >N</span
+        >
+        <div class="flex flex-col leading-tight">
+          <h2
+            style="margin:0;font-family:var(--serif);font-weight:600;font-size:15px;color:var(--ink)"
+          >
+            Nestor
+          </h2>
+          <span
+            class="font-mono-label"
+            style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint)"
+            >your teacher</span
+          >
+        </div>
+      </div>
 
       <div #scrollBox class="flex flex-col gap-2.5 max-h-[55vh] overflow-y-auto pb-1">
         @for (message of messages(); track message.id) {
@@ -83,6 +101,8 @@ const FEED_ICONS: Record<FeedIcon, string> = {
             class="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap"
             [class.self-end]="message.role === 'user'"
             [class.self-start]="message.role === 'assistant'"
+            [class.rounded-tr-sm]="message.role === 'user'"
+            [class.rounded-tl-sm]="message.role === 'assistant'"
             [style]="message.role === 'user' ? userBubble : teacherBubble"
           >
             {{ message.content }}
@@ -101,9 +121,10 @@ const FEED_ICONS: Record<FeedIcon, string> = {
                   <ng-icon name="lucideWandSparkles" size="14" />
                   {{ proposal.kind === 'amplify' ? 'Clarify lesson' : 'New lesson' }}
                 </span>
-                <span class="text-sm font-semibold" style="color:var(--ink)">{{
-                  proposal.objective
-                }}</span>
+                <span
+                  style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14.5px"
+                  >{{ proposal.objective }}</span
+                >
                 <span class="text-xs" style="color:var(--muted)">{{ proposal.rationale }}</span>
                 <div class="flex gap-2 mt-1">
                   <button
@@ -148,9 +169,11 @@ const FEED_ICONS: Record<FeedIcon, string> = {
                 >
                   Lesson ready · tap to read
                 </span>
-                <span class="text-sm font-semibold truncate" style="color:var(--ink)">{{
-                  lesson.title
-                }}</span>
+                <span
+                  class="truncate"
+                  style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14.5px"
+                  >{{ lesson.title }}</span
+                >
               </span>
             </a>
           }
@@ -212,8 +235,10 @@ const FEED_ICONS: Record<FeedIcon, string> = {
                   class="animate-spin"
                   style="color:var(--accent)"
                 />
-                <span class="text-sm font-semibold" style="color:var(--ink)">
-                  Creating your lesson
+                <span
+                  style="color:var(--ink);font-family:var(--serif);font-weight:600;font-size:14px"
+                >
+                  Composing your lesson
                 </span>
                 <span class="ml-auto text-xs tabular-nums" style="color:var(--muted)">
                   {{ elapsedLabel() }}

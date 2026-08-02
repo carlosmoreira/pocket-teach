@@ -14,7 +14,7 @@ import { DbService } from '../../data/db.service';
     <main class="h-dvh w-full flex flex-col" style="background:var(--bg)">
       <header
         class="flex items-center gap-3 px-4 py-3 shrink-0"
-        style="background:var(--panel);border-bottom:1px solid var(--line)"
+        style="background:var(--panel);border-bottom:1px solid var(--hair)"
       >
         <a
           [routerLink]="['/project', projectId()]"
@@ -24,7 +24,13 @@ import { DbService } from '../../data/db.service';
         >
           <ng-icon name="lucideArrowLeft" size="18" />
         </a>
-        <h1 class="text-sm font-bold tracking-tight truncate" style="color:var(--ink)">
+        <span class="font-mono-label shrink-0" style="color:var(--accent);font-size:11px">{{
+          seqLabel()
+        }}</span>
+        <h1
+          class="truncate"
+          style="color:var(--muted);font-family:var(--serif);font-weight:600;font-size:15px"
+        >
           {{ title() }}
         </h1>
       </header>
@@ -60,6 +66,14 @@ export class LessonComponent implements OnInit, OnDestroy {
   protected readonly error = signal<string | null>(null);
 
   private objectUrl: string | null = null;
+
+  // The slug is prefixed with the zero-padded lesson number (e.g. "0005-…"); the
+  // reader surfaces it as a running "▸ 05" so the lesson's place in the course is
+  // always visible above the Tufte body.
+  protected seqLabel(): string {
+    const match = /^(\d+)/.exec(this.slug());
+    return match ? `▸ ${match[1].replace(/^0+(?=\d)/, '').padStart(2, '0')}` : '▸';
+  }
 
   async ngOnInit(): Promise<void> {
     // Offline replica first, so a saved lesson reads without the backend.
