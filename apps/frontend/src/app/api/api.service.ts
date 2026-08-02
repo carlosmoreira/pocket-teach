@@ -161,7 +161,7 @@ function eventType(value: unknown): string | null {
   return String((value as { type: unknown }).type);
 }
 
-const CHAT_TYPES = ['message', 'proposal', 'record', 'done', 'error'];
+const CHAT_TYPES = ['message', 'activity', 'proposal', 'record', 'done', 'error'];
 function isChatEvent(value: unknown): value is ChatEvent {
   const type = eventType(value);
   return type !== null && CHAT_TYPES.includes(type);

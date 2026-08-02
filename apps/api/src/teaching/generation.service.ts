@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { LLM_PROVIDER, type LlmProvider } from '../providers/llm-provider';
 import { WorkspaceService } from '../workspace/workspace.service';
 import type { LessonSummary } from '../workspace/workspace.types';
+import { describeToolActivity } from './activity';
 import { wrapLesson } from './lesson-template';
 import {
   GENERATION_PROMPT,
@@ -164,14 +165,14 @@ export class GenerationService {
               researching = true;
               emit({ type: 'phase', phase: 'researching' });
             }
-            const detail = activityDetail(part.toolName, part.input);
+            const activity = describeToolActivity(part.toolName, part.input);
             // The model often repeats a query across steps; collapse consecutive
             // duplicates so the feed doesn't stutter the same line.
-            if (detail) {
-              const key = `${detail.kind}:${detail.detail}`;
+            if (activity) {
+              const key = `${activity.kind}:${activity.detail}`;
               if (key !== lastActivity) {
                 lastActivity = key;
-                emit(detail);
+                emit({ type: 'activity', kind: activity.kind, detail: activity.detail });
               }
             }
           }
@@ -220,35 +221,6 @@ export class GenerationService {
 
     emit({ type: 'phase', phase: 'done' });
     emit({ type: 'done' });
-  }
-}
-
-// Translate a research tool call into a feed line. web search carries a query;
-// web fetch (and read_lesson) carry the thing being opened. Unknown tools emit
-// nothing rather than a confusing raw payload.
-function activityDetail(
-  toolName: string,
-  input: unknown,
-): { type: 'activity'; kind: 'search' | 'read'; detail: string } | undefined {
-  const args = (input ?? {}) as { query?: unknown; url?: unknown; slug?: unknown };
-  const name = toolName.toLowerCase();
-  if (name.includes('search') && typeof args.query === 'string' && args.query.trim()) {
-    return { type: 'activity', kind: 'search', detail: args.query.trim() };
-  }
-  if (name.includes('fetch') && typeof args.url === 'string' && args.url.trim()) {
-    return { type: 'activity', kind: 'read', detail: prettyUrl(args.url.trim()) };
-  }
-  if (toolName === 'read_lesson' && typeof args.slug === 'string' && args.slug.trim()) {
-    return { type: 'activity', kind: 'read', detail: `earlier lesson · ${args.slug.trim()}` };
-  }
-  return undefined;
-}
-
-function prettyUrl(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
   }
 }
 

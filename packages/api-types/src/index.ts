@@ -76,6 +76,7 @@ export type GenerationEvent =
 
 export type ChatEvent =
   | { type: 'message'; delta: string }
+  | { type: 'activity'; kind: GenerationActivityKind; detail: string }
   | { type: 'proposal'; proposal: Proposal }
   | { type: 'record'; note: string }
   | { type: 'done' }
