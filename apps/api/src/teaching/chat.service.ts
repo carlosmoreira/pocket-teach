@@ -3,6 +3,7 @@ import { stepCountIs, streamText, tool, type ModelMessage, type ToolSet } from '
 import { z } from 'zod';
 import { LLM_PROVIDER, type LlmProvider } from '../providers/llm-provider';
 import { WorkspaceService, type MemoryFile } from '../workspace/workspace.service';
+import { describeToolActivity } from './activity';
 import {
   CHAT_PROMPT,
   PROPOSE_LESSON_DESCRIPTION,
@@ -119,10 +120,22 @@ export class ChatService {
         maxOutputTokens: CHAT_MAX_TOKENS,
       });
 
+      let lastActivity = '';
       for await (const part of result.fullStream) {
         if (part.type === 'text-delta') {
           fullText += part.text;
           emit({ type: 'message', delta: part.text } satisfies ChatEvent);
+        } else if (part.type === 'tool-call') {
+          // Surface a research/lookup step so a grounding turn reads as visible
+          // work ("Searching…") rather than a silent 30-second wait.
+          const activity = describeToolActivity(part.toolName, part.input);
+          if (activity) {
+            const key = `${activity.kind}:${activity.detail}`;
+            if (key !== lastActivity) {
+              lastActivity = key;
+              emit({ type: 'activity', kind: activity.kind, detail: activity.detail });
+            }
+          }
         } else if (part.type === 'error') {
           throw part.error;
         }

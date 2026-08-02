@@ -122,6 +122,37 @@ export class WorkspaceService {
     });
   }
 
+  // Rewrite an existing lesson in place — same seq, slug, and file, so it keeps
+  // its spot in the course. The prior version stays in git history for undo.
+  // Used by amplify (clarify / reword an existing lesson).
+  async updateLesson(projectId: string, slug: string, input: LessonInput): Promise<LessonSummary> {
+    return this.locks.run(projectId, async () => {
+      const lessons = await this.listLessons(projectId);
+      // Match readLesson's order — exact slug first, then the de-numbered form —
+      // so the lesson we rewrite is always the one the model was shown.
+      let index = lessons.findIndex((l) => l.slug === slug);
+      if (index === -1) index = lessons.findIndex((l) => l.slug.replace(/^\d+-/, '') === slug);
+      if (index === -1) {
+        throw new Error(`cannot amplify: lesson "${slug}" is not in the index`);
+      }
+      const existing = lessons[index];
+      const summary: LessonSummary = {
+        ...existing,
+        title: input.title,
+        recap: input.recap,
+        primarySource: input.primarySource,
+        linkedTerms: input.linkedTerms ?? existing.linkedTerms,
+      };
+
+      const next = [...lessons];
+      next[index] = summary;
+      await this.repo.writeFile(projectId, existing.file, input.html);
+      await this.repo.writeFile(projectId, LESSONS_INDEX, JSON.stringify(next, null, 2));
+      await this.repo.commit(projectId, `amplify ${existing.slug}: ${input.title}`);
+      return summary;
+    });
+  }
+
   // Not committed here (kept low-noise); the next memory/lesson commit sweeps it
   // in via `git add -A`. On disk immediately either way.
   async appendTranscript(projectId: string, entry: unknown): Promise<void> {

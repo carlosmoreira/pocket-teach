@@ -11,8 +11,10 @@ import { z } from 'zod';
 import { LLM_PROVIDER, type LlmProvider } from '../providers/llm-provider';
 import { WorkspaceService } from '../workspace/workspace.service';
 import type { LessonSummary } from '../workspace/workspace.types';
+import { describeToolActivity } from './activity';
 import { wrapLesson } from './lesson-template';
 import {
+  AMPLIFY_PROMPT,
   GENERATION_PROMPT,
   READ_LESSON_DESCRIPTION,
   SYSTEM_PREAMBLE,
@@ -51,6 +53,9 @@ export interface GenerateOptions {
   // the Teacher picks the next lesson from the roadmap and ZPD.
   objective?: string;
   focus?: string;
+  // Present → amplify: rewrite this existing lesson in place (same slug/number)
+  // rather than creating a new one. focus/objective say what to fix.
+  targetSlug?: string;
 }
 
 @Injectable()
@@ -75,6 +80,22 @@ export class GenerationService {
       }
       const context = await this.workspace.readIndex(projectId);
 
+      // Amplify: rewrite an existing lesson in place. We hand the model the
+      // current lesson to improve, and the write tool updates rather than
+      // appends. A missing target is a real error, not a silent new lesson.
+      const amplifySlug = opts.targetSlug;
+      let existingHtml: string | undefined;
+      if (amplifySlug) {
+        existingHtml = await this.workspace.readLesson(projectId, amplifySlug);
+        if (existingHtml === undefined) {
+          emit({
+            type: 'error',
+            message: `Couldn't find the lesson to update (${amplifySlug}).`,
+          });
+          return;
+        }
+      }
+
       const tools: ToolSet = {
         // A provider without native web search would run ungrounded here; when
         // one arrives, wire the SearchProvider seam in as fallback grounding.
@@ -98,14 +119,17 @@ export class GenerationService {
             if (claimed) return { ok: true, slug: written?.slug ?? '' };
             claimed = true;
             try {
-              written = await this.workspace.writeLesson(projectId, {
+              const lesson = {
                 slug: input.slug,
                 title: input.title,
                 recap: input.recap,
                 primarySource: input.primarySource,
                 linkedTerms: input.linkedTerms,
                 html: wrapLesson(input.html),
-              });
+              };
+              written = amplifySlug
+                ? await this.workspace.updateLesson(projectId, amplifySlug, lesson)
+                : await this.workspace.writeLesson(projectId, lesson);
               emit({ type: 'lesson', lesson: written });
               return { ok: true, slug: written.slug };
             } catch (err) {
@@ -127,12 +151,22 @@ export class GenerationService {
         system: [
           {
             role: 'system',
-            content: [SYSTEM_PREAMBLE, GENERATION_PROMPT].join('\n\n'),
+            content: [SYSTEM_PREAMBLE, amplifySlug ? AMPLIFY_PROMPT : GENERATION_PROMPT].join(
+              '\n\n',
+            ),
             providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
           },
           { role: 'system', content: `# Workspace context\n${context}` },
         ] satisfies SystemModelMessage[],
-        messages: [{ role: 'user', content: instruction(opts) }],
+        messages: [
+          {
+            role: 'user',
+            content:
+              existingHtml !== undefined
+                ? amplifyInstruction(opts, lessonBody(existingHtml))
+                : instruction(opts),
+          },
+        ],
         tools,
         // Stop the instant the lesson is written. Letting the loop run another
         // step past write_lesson has surfaced malformed-history errors from the
@@ -164,14 +198,14 @@ export class GenerationService {
               researching = true;
               emit({ type: 'phase', phase: 'researching' });
             }
-            const detail = activityDetail(part.toolName, part.input);
+            const activity = describeToolActivity(part.toolName, part.input);
             // The model often repeats a query across steps; collapse consecutive
             // duplicates so the feed doesn't stutter the same line.
-            if (detail) {
-              const key = `${detail.kind}:${detail.detail}`;
+            if (activity) {
+              const key = `${activity.kind}:${activity.detail}`;
               if (key !== lastActivity) {
                 lastActivity = key;
-                emit(detail);
+                emit({ type: 'activity', kind: activity.kind, detail: activity.detail });
               }
             }
           }
@@ -223,33 +257,17 @@ export class GenerationService {
   }
 }
 
-// Translate a research tool call into a feed line. web search carries a query;
-// web fetch (and read_lesson) carry the thing being opened. Unknown tools emit
-// nothing rather than a confusing raw payload.
-function activityDetail(
-  toolName: string,
-  input: unknown,
-): { type: 'activity'; kind: 'search' | 'read'; detail: string } | undefined {
-  const args = (input ?? {}) as { query?: unknown; url?: unknown; slug?: unknown };
-  const name = toolName.toLowerCase();
-  if (name.includes('search') && typeof args.query === 'string' && args.query.trim()) {
-    return { type: 'activity', kind: 'search', detail: args.query.trim() };
-  }
-  if (name.includes('fetch') && typeof args.url === 'string' && args.url.trim()) {
-    return { type: 'activity', kind: 'read', detail: prettyUrl(args.url.trim()) };
-  }
-  if (toolName === 'read_lesson' && typeof args.slug === 'string' && args.slug.trim()) {
-    return { type: 'activity', kind: 'read', detail: `earlier lesson · ${args.slug.trim()}` };
-  }
-  return undefined;
+function amplifyInstruction(opts: GenerateOptions, currentBody: string): string {
+  const focus = opts.focus || opts.objective || 'Make it clearer and plainer.';
+  return `Rewrite this lesson to fix what the learner flagged, keeping its objective and slug.\n\nWhat to fix: ${focus}\n\n--- CURRENT LESSON BODY (this is the one to rewrite) ---\n${currentBody}`;
 }
 
-function prettyUrl(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
+// The stored lesson is the full wrapped document (shell + canonical CSS); for an
+// amplify the model only needs the authored body, so we hand it just the <main>
+// content — smaller, and no shell for it to accidentally echo back.
+function lessonBody(wrapped: string): string {
+  const match = /<main[^>]*>([\s\S]*?)<\/main>/i.exec(wrapped);
+  return (match ? match[1] : wrapped).trim();
 }
 
 function instruction(opts: GenerateOptions): string {

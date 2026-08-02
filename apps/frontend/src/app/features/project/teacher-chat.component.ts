@@ -89,7 +89,7 @@ const FEED_ICONS: Record<FeedIcon, string> = {
           <h2
             style="margin:0;font-family:var(--serif);font-weight:600;font-size:15px;color:var(--ink)"
           >
-            Nestor
+            Noodle
           </h2>
           <span
             class="font-mono-label"
@@ -193,10 +193,21 @@ const FEED_ICONS: Record<FeedIcon, string> = {
           </div>
         } @else if (sending()) {
           <div
-            class="self-start rounded-2xl px-3.5 py-2.5 text-sm"
+            class="self-start rounded-2xl px-3.5 py-2.5 text-sm flex items-center gap-2"
             style="background:var(--panel);border:1px solid var(--line);color:var(--muted)"
           >
-            Thinking…
+            @if (chatActivity(); as act) {
+              <ng-icon
+                [name]="act.kind === 'search' ? 'lucideSearch' : 'lucideGlobe'"
+                size="14"
+                style="color:var(--accent-2);flex:none"
+              />
+              <span class="min-w-0 truncate">
+                {{ act.kind === 'search' ? 'Searching' : 'Reading' }} · {{ act.detail }}
+              </span>
+            } @else {
+              Thinking…
+            }
           </div>
         }
       </div>
@@ -344,6 +355,9 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
   protected readonly streaming = signal('');
   protected readonly sending = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly chatActivity = signal<{ kind: 'search' | 'read'; detail: string } | null>(
+    null,
+  );
 
   protected readonly generatingFor = signal<string | null>(null);
   protected readonly generatingObjective = computed(() => {
@@ -454,6 +468,7 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     this.error.set(null);
     this.sending.set(true);
     this.streaming.set('');
+    this.chatActivity.set(null);
     try {
       let answer = '';
       let proposal: Proposal | undefined;
@@ -461,6 +476,8 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
         if (event.type === 'message') {
           answer += event.delta;
           this.streaming.set(answer);
+        } else if (event.type === 'activity') {
+          this.chatActivity.set({ kind: event.kind, detail: event.detail });
         } else if (event.type === 'proposal') {
           proposal = event.proposal;
         } else if (event.type === 'error') {
@@ -475,6 +492,7 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     } finally {
       this.streaming.set('');
       this.sending.set(false);
+      this.chatActivity.set(null);
     }
   }
 
@@ -501,7 +519,12 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     try {
       for await (const event of this.api.generateLesson(
         this.projectId(),
-        { objective: this.genRequestObjective, focus: proposal.focus },
+        {
+          objective: this.genRequestObjective,
+          focus: proposal.focus,
+          kind: proposal.kind,
+          targetSlug: proposal.targetSlug,
+        },
         this.abort.signal,
       )) {
         switch (event.type) {
@@ -527,13 +550,11 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
             // Announce it inline with a tappable card so the teacher "says" it's
             // done and you don't have to scroll up to find the lesson.
             if (created) {
-              this.appendMessage(
-                'assistant',
-                'Done — your new lesson is ready.',
-                undefined,
-                created,
-                true,
-              );
+              const done =
+                proposal.kind === 'amplify'
+                  ? "Done — I've rewritten that lesson."
+                  : 'Done — your new lesson is ready.';
+              this.appendMessage('assistant', done, undefined, created, true);
               this.notifications.lessonReady(created.title);
             }
             return;

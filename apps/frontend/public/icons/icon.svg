@@ -1,8 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Pocket Teach">
-  <rect width="512" height="512" rx="112" fill="#5b5bd6" />
-  <path d="M256 132 116 196v120c0 8 4 15 11 18l124 58c3 2 7 2 10 0l124-58c7-3 11-10 11-18V196L256 132Z" fill="#ffffff" opacity="0.14" />
-  <path d="M256 128 108 192l148 64 148-64-148-64Z" fill="#ffffff" />
-  <path d="M168 240v78c0 20 40 42 88 42s88-22 88-42v-78l-88 38-88-38Z" fill="#ffffff" opacity="0.82" />
-  <path d="M404 192v96" stroke="#ffffff" stroke-width="14" stroke-linecap="round" />
-  <circle cx="404" cy="300" r="16" fill="#2dd4bf" />
+  <defs>
+    <radialGradient id="pt-grad" cx="30%" cy="25%" r="110%">
+      <stop offset="0%" stop-color="#5b55d8" />
+      <stop offset="52%" stop-color="#6f69e0" />
+      <stop offset="100%" stop-color="#0f8f83" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#pt-grad)" />
+  <g transform="translate(-24,-24) scale(5.6)" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round">
+    <path d="M76 50 A26 26 0 0 1 24 50 A23 23 0 0 1 70 50 A20 20 0 0 1 30 50 A17 17 0 0 1 64 50 A14 14 0 0 1 36 50" />
+  </g>
 </svg>

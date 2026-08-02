@@ -22,7 +22,7 @@ export class GenerationController {
     try {
       await this.generation.generate(
         body.projectId,
-        { objective: body.objective, focus: body.focus },
+        { objective: body.objective, focus: body.focus, targetSlug: body.targetSlug },
         (event) => sse.event(event.type, event),
       );
     } catch {
