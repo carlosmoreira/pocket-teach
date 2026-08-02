@@ -191,7 +191,7 @@ export class WorkspaceService {
 
     const lessonIndex = lessons.length
       ? lessons.map((l) => `- ${l.slug} · ${l.title}\n  Recap: ${l.recap}`).join('\n')
-      : '(no lessons yet)';
+      : '(none built yet)';
 
     return [
       section('Mission', mission || '(not set yet)'),
@@ -199,7 +199,9 @@ export class WorkspaceService {
       section('Learner profile', profile || '(nothing recorded yet)'),
       section('Misconceptions to revisit', misconceptions || '(none)'),
       section('Glossary', glossary || '(empty)'),
-      section('Lessons taught', lessonIndex),
+      // Authoritative: this is the complete list of lessons that exist, each with
+      // its slug. The Teacher uses it to know what has and hasn't been built.
+      section('Lesson index — every lesson that exists, with its slug', lessonIndex),
     ].join('\n\n');
   }
 

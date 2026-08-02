@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   hasToolCall,
   stepCountIs,
@@ -60,6 +60,8 @@ export interface GenerateOptions {
 
 @Injectable()
 export class GenerationService {
+  private readonly logger = new Logger(GenerationService.name);
+
   constructor(
     @Inject(LLM_PROVIDER) private readonly provider: LlmProvider,
     private readonly workspace: WorkspaceService,
@@ -73,6 +75,7 @@ export class GenerationService {
     let claimed = false;
     let written: LessonSummary | undefined;
     let writeError: unknown;
+    let streamFailure: unknown;
 
     try {
       if (!(await this.workspace.projectExists(projectId))) {
@@ -88,6 +91,7 @@ export class GenerationService {
       if (amplifySlug) {
         existingHtml = await this.workspace.readLesson(projectId, amplifySlug);
         if (existingHtml === undefined) {
+          await this.recordGenerationFailure(projectId, opts);
           emit({
             type: 'error',
             message: `Couldn't find the lesson to update (${amplifySlug}).`,
@@ -228,17 +232,23 @@ export class GenerationService {
       }
     } catch (err) {
       // If the lesson was already saved, a trailing error is noise — the work
-      // succeeded. Only surface an error when nothing was written.
-      if (!written) {
-        emit({ type: 'error', message: this.provider.describeError(err) });
-        return;
-      }
+      // succeeded. Otherwise fall through to the single failure path below.
+      if (!written) streamFailure = err;
     }
 
     if (!written) {
-      const message = writeError
-        ? this.provider.describeError(writeError)
-        : 'The teacher finished without writing a lesson. Try again.';
+      const message = streamFailure
+        ? this.provider.describeError(streamFailure)
+        : writeError
+          ? this.provider.describeError(writeError)
+          : 'The teacher finished without writing a lesson. Try again.';
+      // Leave a trace: a build that produces nothing must not vanish silently —
+      // the learner (on reload) and the Teacher (next turn) both need to know it
+      // failed, rather than believing a lesson exists that never got saved.
+      this.logger.warn(
+        `generation produced no lesson for ${projectId} (${opts.targetSlug ? `amplify ${opts.targetSlug}` : (opts.objective ?? 'next lesson')}): ${message}`,
+      );
+      await this.recordGenerationFailure(projectId, opts);
       emit({ type: 'error', message });
       return;
     }
@@ -254,6 +264,26 @@ export class GenerationService {
 
     emit({ type: 'phase', phase: 'done' });
     emit({ type: 'done' });
+  }
+
+  // Record a failed build in the transcript so it leaves a trace: the learner
+  // sees it on reload and the Teacher sees it next turn, instead of a lesson
+  // that was announced but never saved.
+  private async recordGenerationFailure(projectId: string, opts: GenerateOptions): Promise<void> {
+    const what = opts.targetSlug
+      ? `rewrite the lesson (${opts.targetSlug})`
+      : `build the lesson${opts.objective ? ` on "${opts.objective}"` : ''}`;
+    try {
+      await this.workspace.appendTranscript(projectId, {
+        role: 'assistant',
+        content: `I tried to ${what}, but the build didn't go through and nothing was saved. Ask me to try again whenever you're ready.`,
+        at: new Date().toISOString(),
+      });
+    } catch (err) {
+      // Best-effort: a failed trace write must not mask the real error, but log
+      // it so we're not fully blind.
+      this.logger.warn(`could not record generation failure for ${projectId}: ${String(err)}`);
+    }
   }
 }
 
