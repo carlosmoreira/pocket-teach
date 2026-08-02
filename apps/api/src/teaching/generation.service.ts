@@ -1,5 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { hasToolCall, stepCountIs, streamText, tool, type ToolSet } from 'ai';
+import {
+  hasToolCall,
+  stepCountIs,
+  streamText,
+  tool,
+  type SystemModelMessage,
+  type ToolSet,
+} from 'ai';
 import { z } from 'zod';
 import { LLM_PROVIDER, type LlmProvider } from '../providers/llm-provider';
 import { WorkspaceService } from '../workspace/workspace.service';
@@ -113,9 +120,18 @@ export class GenerationService {
 
       const result = streamText({
         model: this.provider.languageModel(),
-        system: [SYSTEM_PREAMBLE, GENERATION_PROMPT, `# Workspace context\n${context}`].join(
-          '\n\n',
-        ),
+        // The large, invariant instructions are marked cacheable so repeated
+        // generations reuse them (faster first token, cheaper). The per-project
+        // workspace context is a second, uncached system block after the cache
+        // breakpoint, so a changing workspace never busts the cached prefix.
+        system: [
+          {
+            role: 'system',
+            content: [SYSTEM_PREAMBLE, GENERATION_PROMPT].join('\n\n'),
+            providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+          },
+          { role: 'system', content: `# Workspace context\n${context}` },
+        ] satisfies SystemModelMessage[],
         messages: [{ role: 'user', content: instruction(opts) }],
         tools,
         // Stop the instant the lesson is written. Letting the loop run another

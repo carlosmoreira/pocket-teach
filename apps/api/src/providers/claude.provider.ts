@@ -5,8 +5,10 @@ import { AppConfigService } from '../config/config.service';
 import type { LlmProvider } from './llm-provider';
 import { providerErrorMessage } from './provider-error';
 
-const WEB_SEARCH_MAX_USES = 6;
-const WEB_FETCH_MAX_USES = 5;
+// Grounding is the slowest part of a generation; a tight budget keeps the
+// research loop from wandering. Two or three good sources make a lesson.
+const WEB_SEARCH_MAX_USES = 4;
+const WEB_FETCH_MAX_USES = 3;
 
 const MISSING_KEY_ERROR =
   'ANTHROPIC_API_KEY is not set. The backend starts without it, but generation and chat need a real key — set ANTHROPIC_API_KEY in the environment.';
