@@ -519,7 +519,12 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
     try {
       for await (const event of this.api.generateLesson(
         this.projectId(),
-        { objective: this.genRequestObjective, focus: proposal.focus },
+        {
+          objective: this.genRequestObjective,
+          focus: proposal.focus,
+          kind: proposal.kind,
+          targetSlug: proposal.targetSlug,
+        },
         this.abort.signal,
       )) {
         switch (event.type) {
@@ -545,13 +550,11 @@ export class TeacherChatComponent implements OnInit, OnDestroy {
             // Announce it inline with a tappable card so the teacher "says" it's
             // done and you don't have to scroll up to find the lesson.
             if (created) {
-              this.appendMessage(
-                'assistant',
-                'Done — your new lesson is ready.',
-                undefined,
-                created,
-                true,
-              );
+              const done =
+                proposal.kind === 'amplify'
+                  ? "Done — I've rewritten that lesson."
+                  : 'Done — your new lesson is ready.';
+              this.appendMessage('assistant', done, undefined, created, true);
               this.notifications.lessonReady(created.title);
             }
             return;

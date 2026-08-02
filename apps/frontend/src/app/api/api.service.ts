@@ -59,7 +59,7 @@ export class ApiService {
 
   generateLesson(
     projectId: string,
-    opts: { objective?: string; focus?: string },
+    opts: { objective?: string; focus?: string; kind?: string; targetSlug?: string },
     signal?: AbortSignal,
   ): AsyncGenerator<GenerationEvent> {
     return this.stream(
