@@ -20,19 +20,27 @@ import type { CachedProject } from '../../data/models';
   template: `
     <main class="min-h-dvh w-full flex justify-center px-4 py-6" style="background:var(--bg)">
       <div class="w-full max-w-lg flex flex-col gap-5 pb-24">
-        <header class="flex items-center gap-3">
-          <span
-            class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0"
-            style="background:var(--accent);font-family:var(--serif);font-weight:700;font-size:20px"
-            >P</span
-          >
-          <h1
-            class="flex-1 text-2xl"
-            style="color:var(--ink);font-family:var(--serif);font-weight:600;letter-spacing:-0.01em"
-          >
-            Pocket Teach
-          </h1>
-        </header>
+        <div class="flex flex-col gap-2.5">
+          <header class="flex items-center gap-3">
+            <span
+              class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0"
+              style="background:var(--accent);font-family:var(--serif);font-weight:700;font-size:20px"
+              >P</span
+            >
+            <h1
+              class="flex-1 text-2xl"
+              style="color:var(--ink);font-family:var(--serif);font-weight:600;letter-spacing:-0.01em"
+            >
+              Pocket Teach
+            </h1>
+          </header>
+          <p class="text-[15px] leading-relaxed" style="color:var(--muted)">
+            Your pocket tutor. Tell
+            <span style="color:var(--accent);font-weight:600">Noodle</span> what you want to learn
+            and why, and it builds you short, self-contained lessons grounded in real sources —
+            yours to keep and read anywhere, even offline.
+          </p>
+        </div>
 
         @if (!loaded()) {
           <p class="text-sm" style="color:var(--muted)">Loading…</p>

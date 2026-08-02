@@ -89,7 +89,7 @@ const FEED_ICONS: Record<FeedIcon, string> = {
           <h2
             style="margin:0;font-family:var(--serif);font-weight:600;font-size:15px;color:var(--ink)"
           >
-            Nestor
+            Noodle
           </h2>
           <span
             class="font-mono-label"
