@@ -23,10 +23,24 @@ import type { CachedProject } from '../../data/models';
         <div class="flex flex-col gap-2.5">
           <header class="flex items-center gap-3">
             <span
-              class="grid place-items-center w-9 h-9 rounded-xl text-white shrink-0"
-              style="background:var(--accent);font-family:var(--serif);font-weight:700;font-size:20px"
-              >P</span
+              class="grid place-items-center w-9 h-9 rounded-xl shrink-0"
+              style="background:radial-gradient(120% 120% at 30% 25%, #5b55d8 0%, #6f69e0 52%, #0f8f83 132%);box-shadow:var(--shadow)"
             >
+              <svg
+                viewBox="0 0 100 100"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="#fff"
+                stroke-width="5.5"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M76 50 A26 26 0 0 1 24 50 A23 23 0 0 1 70 50 A20 20 0 0 1 30 50 A17 17 0 0 1 64 50 A14 14 0 0 1 36 50"
+                />
+              </svg>
+            </span>
             <h1
               class="flex-1 text-2xl"
               style="color:var(--ink);font-family:var(--serif);font-weight:600;letter-spacing:-0.01em"
